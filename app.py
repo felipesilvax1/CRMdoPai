@@ -13,8 +13,8 @@ BRASIL_API_URL = "https://brasilapi.com.br/api/cnpj/v1"
 
 def buscar_cnpj_no_google(nome_empresa):
     """
-    Busca no Google por um CNPJ associado ao nome da empresa.
-    Retorna o primeiro CNPJ encontrado ou None.
+    Busca no Google por CNPJs associados ao nome da empresa e valida-os.
+    Retorna o primeiro CNPJ válido encontrado ou None.
     """
     try:
         query = f'"{quote_plus(nome_empresa)}" CNPJ'
@@ -25,23 +25,29 @@ def buscar_cnpj_no_google(nome_empresa):
         }
 
         response = requests.get(url, headers=headers)
-        response.raise_for_status()  # Lança exceção para respostas de erro (4xx ou 5xx)
+        response.raise_for_status()
 
         soup = BeautifulSoup(response.text, 'html.parser')
 
-        # Expressão regular para encontrar CNPJs formatados ou não.
-        # XX.XXX.XXX/XXXX-XX ou XXXXXXXXXXXXXX
         cnpj_pattern = re.compile(r'\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}')
-
         text_content = soup.get_text()
 
-        match = cnpj_pattern.search(text_content)
+        # Encontra todos os potenciais CNPJs na página
+        potential_cnpjs = cnpj_pattern.findall(text_content)
 
-        if match:
-            # Limpa o CNPJ para retornar apenas os dígitos
-            return re.sub(r'[^0-9]', '', match.group(0))
+        # Limpa e cria um conjunto de CNPJs únicos para evitar checagens repetidas
+        cleaned_cnpjs = {re.sub(r'[^0-9]', '', cnpj) for cnpj in potential_cnpjs}
 
-        return None
+        # Valida cada CNPJ encontrado
+        for cnpj in cleaned_cnpjs:
+            if len(cnpj) == 14:
+                # Usa a função existente para verificar se o CNPJ é válido na BrasilAPI
+                dados, _ = get_cnpj_details(cnpj)
+                if dados:
+                    # Se encontrou dados válidos, retorna este CNPJ
+                    return cnpj
+
+        return None  # Retorna None se nenhum CNPJ válido for encontrado
 
     except requests.exceptions.RequestException as e:
         print(f"Erro ao buscar no Google: {e}")
