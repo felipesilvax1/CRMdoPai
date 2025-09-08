@@ -11,47 +11,97 @@ BRASIL_API_URL = "https://brasilapi.com.br/api/cnpj/v1"
 # A URL do CNPJ.ws não será mais usada, mas vou deixar comentada por enquanto.
 # CNPJ_WS_API_URL = "https://cnpj.ws/api/v1/cnpj/search"
 
-def buscar_cnpj_no_google(nome_empresa):
+def _scrape_and_validate(url):
     """
-    Busca no Google por CNPJs associados ao nome da empresa e valida-os.
+    Raspa uma URL em busca de CNPJs e valida o primeiro encontrado na BrasilAPI.
     Retorna o primeiro CNPJ válido encontrado ou None.
     """
     try:
-        query = f'"{quote_plus(nome_empresa)}" CNPJ'
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+        cnpj_pattern = re.compile(r'\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}')
+        text_content = soup.get_text()
+
+        potential_cnpjs = cnpj_pattern.findall(text_content)
+        cleaned_cnpjs = {re.sub(r'[^0-9]', '', cnpj) for cnpj in potential_cnpjs}
+
+        for cnpj in cleaned_cnpjs:
+            if len(cnpj) == 14:
+                dados, _ = get_cnpj_details(cnpj)
+                if dados:
+                    return cnpj
+        return None
+    except requests.exceptions.RequestException as e:
+        print(f"Erro durante o scraping na URL {url}: {e}")
+        return None
+
+def _find_official_site_url(nome_empresa):
+    """
+    Busca no Google pelo site oficial de uma empresa.
+    Retorna a URL do primeiro resultado de busca.
+    """
+    try:
+        query = f'site oficial "{quote_plus(nome_empresa)}"'
         url = f"https://www.google.com/search?q={query}"
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
 
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
 
         soup = BeautifulSoup(response.text, 'html.parser')
 
-        cnpj_pattern = re.compile(r'\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}')
-        text_content = soup.get_text()
+        # Encontra o link dentro do primeiro resultado de busca do Google
+        # A estrutura pode mudar, mas 'div.g' e 'a' são seletores comuns.
+        first_result = soup.find('div', class_='g')
+        if first_result:
+            link_tag = first_result.find('a')
+            if link_tag and link_tag.has_attr('href'):
+                return link_tag['href']
 
-        # Encontra todos os potenciais CNPJs na página
-        potential_cnpjs = cnpj_pattern.findall(text_content)
-
-        # Limpa e cria um conjunto de CNPJs únicos para evitar checagens repetidas
-        cleaned_cnpjs = {re.sub(r'[^0-9]', '', cnpj) for cnpj in potential_cnpjs}
-
-        # Valida cada CNPJ encontrado
-        for cnpj in cleaned_cnpjs:
-            if len(cnpj) == 14:
-                # Usa a função existente para verificar se o CNPJ é válido na BrasilAPI
-                dados, _ = get_cnpj_details(cnpj)
-                if dados:
-                    # Se encontrou dados válidos, retorna este CNPJ
-                    return cnpj
-
-        return None  # Retorna None se nenhum CNPJ válido for encontrado
-
-    except requests.exceptions.RequestException as e:
-        print(f"Erro ao buscar no Google: {e}")
         return None
+    except requests.exceptions.RequestException as e:
+        print(f"Erro ao buscar site oficial no Google: {e}")
+        return None
+
+def encontrar_cnpj(nome_empresa, localizacao=None):
+    """
+    Orquestra a busca em cascata por um CNPJ, tentando várias estratégias.
+    Retorna um CNPJ válido ou None.
+    """
+    # Estratégia 1: Busca Direta no Google
+    print("Tentando Estratégia 1: Busca Direta no Google...")
+    query1 = f'"{quote_plus(nome_empresa)}" CNPJ'
+    url1 = f"https://www.google.com/search?q={query1}"
+    cnpj_encontrado = _scrape_and_validate(url1)
+    if cnpj_encontrado:
+        print("Estratégia 1 bem-sucedida.")
+        return cnpj_encontrado
+
+    # Estratégia 2: Busca Geolocalizada no Google
+    if localizacao:
+        print("Tentando Estratégia 2: Busca Geolocalizada...")
+        query2 = f'"{quote_plus(nome_empresa)}" "{quote_plus(localizacao)}" CNPJ'
+        url2 = f"https://www.google.com/search?q={query2}"
+        cnpj_encontrado = _scrape_and_validate(url2)
+        if cnpj_encontrado:
+            print("Estratégia 2 bem-sucedida.")
+            return cnpj_encontrado
+
+    # Estratégia 3: Caça ao Site Oficial
+    print("Tentando Estratégia 3: Caça ao Site Oficial...")
+    site_url = _find_official_site_url(nome_empresa)
+    if site_url:
+        print(f"Site oficial encontrado: {site_url}. Verificando CNPJ no site...")
+        cnpj_encontrado = _scrape_and_validate(site_url)
+        if cnpj_encontrado:
+            print("Estratégia 3 bem-sucedida.")
+            return cnpj_encontrado
+
+    print("Nenhuma estratégia foi bem-sucedida.")
+    return None
 
 def get_cnpj_details(cnpj):
     """Busca os detalhes de um CNPJ na BrasilAPI."""
@@ -77,31 +127,33 @@ def get_cnpj_details(cnpj):
 def index():
     dados = None
     erro = None
-    query = None
+    query_nome = None
+    query_localizacao = None
 
     if request.method == 'POST':
-        query = request.form.get('query')
-        if not query:
+        query_nome = request.form.get('nome')
+        query_localizacao = request.form.get('localizacao')
+
+        if not query_nome:
             erro = "Por favor, digite um CNPJ ou nome de empresa."
         else:
             # Limpa a query para ver se é um CNPJ
-            cleaned_query = re.sub(r'[^0-9]', '', query)
+            cleaned_query = re.sub(r'[^0-9]', '', query_nome)
 
-            # Se a query limpa for apenas dígitos, trata como CNPJ
+            # Se a query limpa for apenas dígitos e tiver 14 caracteres, trata como CNPJ
             if cleaned_query.isdigit() and len(cleaned_query) == 14:
                 dados, erro = get_cnpj_details(cleaned_query)
-            # Senão, trata como nome de empresa
+            # Senão, trata como nome de empresa e usa o detetive
             else:
-                cnpj_encontrado = buscar_cnpj_no_google(query)
+                cnpj_encontrado = encontrar_cnpj(query_nome, query_localizacao)
                 if cnpj_encontrado:
                     dados, erro = get_cnpj_details(cnpj_encontrado)
                     if dados and not erro:
-                        # Adiciona uma nota de que o CNPJ foi encontrado via busca
-                        dados['nota_busca'] = f"CNPJ encontrado por busca para o termo: '{query}'"
+                        dados['nota_busca'] = f"CNPJ encontrado por busca para o termo: '{query_nome}'"
                 else:
-                    erro = f"Não foi possível encontrar um CNPJ para o nome '{query}'. Tente ser mais específico."
+                    erro = f"Não foi possível encontrar um CNPJ para '{query_nome}'. Tente ser mais específico ou adicionar uma localização."
 
-    return render_template('index.html', dados=dados, erro=erro, query=query)
+    return render_template('index.html', dados=dados, erro=erro, query_nome=query_nome, query_localizacao=query_localizacao)
 
 if __name__ == '__main__':
     app.run(debug=True)
