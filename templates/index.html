@@ -3,66 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Consulta de CNPJ e Empresas</title>
+    <title>Consulta de CNPJ</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* Estilos para o sistema de abas com radio buttons */
-        .tab-content {
-            display: none;
-        }
-        #tab-cnpj:checked ~ #form-cnpj,
-        #tab-nome:checked ~ #form-nome {
-            display: block;
-        }
-        .tab-label {
-            cursor: pointer;
-            padding: 0.75rem 1.5rem;
-            border-bottom: 3px solid transparent;
-            transition: all 0.2s ease-in-out;
-        }
-        input[type="radio"]:checked + .tab-label {
-            border-bottom-color: #3b82f6; /* blue-500 */
-            color: #1f2937; /* gray-800 */
-            font-weight: 600;
-        }
-    </style>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-full p-4 font-sans">
     <div class="w-full max-w-2xl mx-auto">
         <div class="bg-white shadow-lg rounded-lg p-6 sm:p-8">
 
-            <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Consulta de Empresas</h1>
+            <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Consulta Inteligente</h1>
 
-            <!-- Abas para seleção de busca -->
-            <div class="flex border-b border-gray-200 mb-6 text-gray-500">
-                <input type="radio" name="search_type" id="tab-cnpj" class="hidden" {% if not search_term %}checked{% endif %}>
-                <label for="tab-cnpj" class="tab-label">Por CNPJ</label>
-
-                <input type="radio" name="search_type" id="tab-nome" class="hidden" {% if search_term %}checked{% endif %}>
-                <label for="tab-nome" class="tab-label">Por Nome</label>
-            </div>
-
-            <!-- Formulário de Busca por CNPJ -->
-            <div id="form-cnpj" class="tab-content">
-                <form method="POST">
-                    <p class="text-gray-600 mb-2">Digite o número do CNPJ para uma consulta direta.</p>
-                    <div class="flex flex-col sm:flex-row gap-2">
-                        <input type="text" name="cnpj" placeholder="Digite o CNPJ aqui" class="flex-grow w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
-                        <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white font-bold px-6 py-3 rounded-lg hover:bg-blue-700 transition">Pesquisar</button>
-                    </div>
-                </form>
-            </div>
-
-            <!-- Formulário de Busca por Nome -->
-            <div id="form-nome" class="tab-content">
-                <form method="POST">
-                    <p class="text-gray-600 mb-2">Digite o nome ou parte do nome da empresa.</p>
-                    <div class="flex flex-col sm:flex-row gap-2">
-                        <input type="text" name="nome" placeholder="Digite o nome da empresa" value="{{ search_term or '' }}" class="flex-grow w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
-                        <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white font-bold px-6 py-3 rounded-lg hover:bg-blue-700 transition">Pesquisar</button>
-                    </div>
-                </form>
-            </div>
+            <form method="POST" class="mb-6">
+                <p class="text-gray-600 mb-2 text-center">Digite um CNPJ ou o nome de uma empresa para buscar.</p>
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <input
+                        type="text"
+                        name="query"
+                        placeholder="CNPJ ou Nome da Empresa"
+                        value="{{ query or '' }}"
+                        class="flex-grow w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                        required
+                    >
+                    <button
+                        type="submit"
+                        class="w-full sm:w-auto bg-blue-600 text-white font-bold px-6 py-3 rounded-lg hover:bg-blue-700 transition"
+                    >
+                        Pesquisar
+                    </button>
+                </div>
+            </form>
 
             <!-- Exibição de Erro -->
             {% if erro %}
@@ -72,25 +40,16 @@
             </div>
             {% endif %}
 
-            <!-- Lista de Resultados da Busca por Nome -->
-            {% if resultados_busca %}
-            <div class="mt-8">
-                <h2 class="text-xl font-semibold text-gray-800 mb-4">Resultados da Busca</h2>
-                <div class="space-y-3">
-                    {% for empresa in resultados_busca %}
-                    <a href="/?cnpj_selecionado={{ empresa.cnpj }}" class="block border border-gray-200 rounded-lg p-4 hover:bg-gray-50 hover:border-blue-500 transition">
-                        <p class="font-bold text-lg text-blue-700">{{ empresa.razao_social }}</p>
-                        <p class="text-gray-700">{{ empresa.nome_fantasia or 'Sem nome fantasia' }}</p>
-                        <p class="text-sm text-gray-500 mt-1">{{ empresa.cnpj }} &bull; {{ empresa.estabelecimento.cidade.nome }} - {{ empresa.estabelecimento.estado.sigla }}</p>
-                    </a>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
-
             <!-- Detalhes Completos do CNPJ -->
             {% if dados %}
             <div class="border border-gray-200 rounded-lg p-6 mt-6 bg-gray-50">
+
+                {% if dados.nota_busca %}
+                <div class="mb-4 p-3 bg-blue-100 text-blue-800 border border-blue-200 rounded-lg text-sm">
+                    <p>{{ dados.nota_busca }}</p>
+                </div>
+                {% endif %}
+
                 <h2 class="text-2xl font-semibold text-gray-900 mb-4">{{ dados.razao_social }}</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                     <div>
@@ -124,7 +83,7 @@
 
         </div>
         <footer class="text-center text-gray-500 mt-4 text-sm">
-            <p>Powered by <a href="https://brasilapi.com.br/" target="_blank" class="text-blue-600 hover:underline">BrasilAPI</a> &amp; <a href="https://cnpj.ws/" target="_blank" class="text-blue-600 hover:underline">CNPJ.ws</a></p>
+            <p>Resultados detalhados fornecidos pela <a href="https://brasilapi.com.br/" target="_blank" class="text-blue-600 hover:underline">BrasilAPI</a>.</p>
         </footer>
     </div>
 </body>

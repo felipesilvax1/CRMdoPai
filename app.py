@@ -1,12 +1,51 @@
 import re
 import requests
 from flask import Flask, render_template, request
+from bs4 import BeautifulSoup
+from urllib.parse import quote_plus
 
 app = Flask(__name__)
 
 # URLs das APIs
 BRASIL_API_URL = "https://brasilapi.com.br/api/cnpj/v1"
-CNPJ_WS_API_URL = "https://cnpj.ws/api/v1/cnpj/search"
+# A URL do CNPJ.ws não será mais usada, mas vou deixar comentada por enquanto.
+# CNPJ_WS_API_URL = "https://cnpj.ws/api/v1/cnpj/search"
+
+def buscar_cnpj_no_google(nome_empresa):
+    """
+    Busca no Google por um CNPJ associado ao nome da empresa.
+    Retorna o primeiro CNPJ encontrado ou None.
+    """
+    try:
+        query = f'"{quote_plus(nome_empresa)}" CNPJ'
+        url = f"https://www.google.com/search?q={query}"
+
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()  # Lança exceção para respostas de erro (4xx ou 5xx)
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        # Expressão regular para encontrar CNPJs formatados ou não.
+        # XX.XXX.XXX/XXXX-XX ou XXXXXXXXXXXXXX
+        cnpj_pattern = re.compile(r'\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}')
+
+        text_content = soup.get_text()
+
+        match = cnpj_pattern.search(text_content)
+
+        if match:
+            # Limpa o CNPJ para retornar apenas os dígitos
+            return re.sub(r'[^0-9]', '', match.group(0))
+
+        return None
+
+    except requests.exceptions.RequestException as e:
+        print(f"Erro ao buscar no Google: {e}")
+        return None
 
 def get_cnpj_details(cnpj):
     """Busca os detalhes de um CNPJ na BrasilAPI."""
@@ -32,56 +71,31 @@ def get_cnpj_details(cnpj):
 def index():
     dados = None
     erro = None
-    resultados_busca = None
-    search_term = None
-
-    # Lógica para quando um CNPJ é selecionado da lista de resultados (via GET)
-    if request.method == 'GET' and 'cnpj_selecionado' in request.args:
-        cnpj_selecionado = request.args.get('cnpj_selecionado')
-        dados, erro = get_cnpj_details(cnpj_selecionado)
+    query = None
 
     if request.method == 'POST':
-        # Lógica para busca direta por CNPJ
-        if 'cnpj' in request.form:
-            cnpj_input = request.form.get('cnpj')
-            if cnpj_input:
-                dados, erro = get_cnpj_details(cnpj_input)
+        query = request.form.get('query')
+        if not query:
+            erro = "Por favor, digite um CNPJ ou nome de empresa."
+        else:
+            # Limpa a query para ver se é um CNPJ
+            cleaned_query = re.sub(r'[^0-9]', '', query)
 
-        # Lógica para busca por nome da empresa
-        elif 'nome' in request.form:
-            nome_input = request.form.get('nome')
-            search_term = nome_input # Para manter o termo na caixa de busca
-            if not nome_input or len(nome_input) < 3:
-                erro = "Por favor, digite pelo menos 3 caracteres para a busca por nome."
+            # Se a query limpa for apenas dígitos, trata como CNPJ
+            if cleaned_query.isdigit() and len(cleaned_query) == 14:
+                dados, erro = get_cnpj_details(cleaned_query)
+            # Senão, trata como nome de empresa
             else:
-                try:
-                    params = {'q': nome_input}
-                    response = requests.get(CNPJ_WS_API_URL, params=params)
+                cnpj_encontrado = buscar_cnpj_no_google(query)
+                if cnpj_encontrado:
+                    dados, erro = get_cnpj_details(cnpj_encontrado)
+                    if dados and not erro:
+                        # Adiciona uma nota de que o CNPJ foi encontrado via busca
+                        dados['nota_busca'] = f"CNPJ encontrado por busca para o termo: '{query}'"
+                else:
+                    erro = f"Não foi possível encontrar um CNPJ para o nome '{query}'. Tente ser mais específico."
 
-                    if response.status_code == 200:
-                        json_response = response.json()
-                        # A API do CNPJ.ws pode não ter uma chave 'results' e retornar a lista direto
-                        # Vamos verificar a estrutura comum
-                        if 'data' in json_response and isinstance(json_response['data'], list):
-                             resultados_busca = json_response['data']
-                        elif isinstance(json_response, list): # Caso a raiz seja a lista
-                             resultados_busca = json_response
-                        else:
-                             resultados_busca = []
-
-                        if not resultados_busca:
-                            erro = f"Nenhuma empresa encontrada com o termo '{nome_input}'."
-                    else:
-                        erro = f"Erro na busca por nome: Status {response.status_code}"
-
-                except requests.exceptions.RequestException:
-                    erro = "Erro de conexão ao realizar a busca por nome."
-
-    return render_template('index.html',
-                           dados=dados,
-                           erro=erro,
-                           resultados_busca=resultados_busca,
-                           search_term=search_term)
+    return render_template('index.html', dados=dados, erro=erro, query=query)
 
 if __name__ == '__main__':
     app.run(debug=True)
