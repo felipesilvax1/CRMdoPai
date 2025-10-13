@@ -1,58 +1,329 @@
 # ═══════════════════════════════════════════════════════════════
-# 🎯 CRM - Docker Compose Principal
+# 🚀 CRM - Ambiente de Desenvolvimento Completo
 # ═══════════════════════════════════════════════════════════════
-# ESTE É O ARQUIVO PADRÃO - USA A STACK ORGANIZADA
+# APLICAÇÃO + OBSERVABILIDADE + SIMULAÇÃO AWS
 # ═══════════════════════════════════════════════════════════════
 
 version: '3.8'
 
-# Incluir CRM Stack (API + LLM)
-include:
-  - docker-compose.crm.yml
+networks:
+  crm-network:
+    driver: bridge
+    name: crm-network
+
+volumes:
+  postgres-data:
+    name: crm-postgres-data
+  ollama-data:
+    name: crm-ollama-data
+  prometheus_data:
+  grafana_data:
+
+services:
+  # ═══════════════════════════════════════════════════════════════
+  # CAMADA 1: INFRAESTRUTURA
+  # ═══════════════════════════════════════════════════════════════
+  
+  # PostgreSQL - Banco de Dados Principal
+  postgres:
+    image: postgres:15
+    container_name: cnpj_postgres_final
+    hostname: cnpj-postgres
+    environment:
+      POSTGRES_DB: cnpj_processed
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - crm-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "stack=infrastructure"
+      - "tier=database"
+
+  # Ollama - LLM Engine (Gemma)
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    hostname: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - crm-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    labels:
+      - "stack=infrastructure"
+      - "tier=ai"
+
+  # ═══════════════════════════════════════════════════════════════
+  # CAMADA 2: BACKEND SERVICES
+  # ═══════════════════════════════════════════════════════════════
+  
+  # API de Dados
+  crm-api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: crm-api
+    hostname: crm-api
+    ports:
+      - "5000:5000"
+    environment:
+      - DB_HOST=cnpj-postgres
+      - DB_PORT=5432
+      - DB_NAME=cnpj_processed
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - USE_POSTGRES=true
+    networks:
+      - crm-network
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "stack=backend"
+      - "tier=api"
+
+  # LLM Service
+  crm-llm:
+    build:
+      context: ./llm-service
+      dockerfile: Dockerfile
+    container_name: crm-llm
+    hostname: crm-llm
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=cnpj-postgres
+      - DB_PORT=5432
+      - DB_NAME=cnpj_processed
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - OLLAMA_HOST=http://ollama:11434
+    networks:
+      - crm-network
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "stack=backend"
+      - "tier=llm"
+
+  # ═══════════════════════════════════════════════════════════════
+  # CAMADA 3: FRONTEND (Produção Opcional)
+  # ═══════════════════════════════════════════════════════════════
+  
+  # Frontend Next.js - Descomentar para produção
+  # crm-frontend:
+  #   build:
+  #     context: ./next-app
+  #     dockerfile: Dockerfile
+  #   container_name: crm-frontend
+  #   hostname: crm-frontend
+  #   ports:
+  #     - "3001:3000"
+  #   environment:
+  #     - NODE_ENV=production
+  #     - NEXT_PUBLIC_API_URL=http://crm-api:5000
+  #     - NEXT_PUBLIC_LLM_URL=http://crm-llm:8000
+  #     - NEXT_PUBLIC_DEV_MODE=false
+  #   networks:
+  #     - crm-network
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - crm-api
+  #     - crm-llm
+  #   labels:
+  #     - "stack=frontend"
+  #     - "tier=web"
+
+  # ═══════════════════════════════════════════════════════════════
+  # CAMADA 4: OBSERVABILIDADE
+  # ═══════════════════════════════════════════════════════════════
+
+  # Prometheus - Coleta de Métricas
+  prometheus:
+    image: prom/prometheus:v2.47.1
+    container_name: prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - crm-network
+    restart: unless-stopped
+    labels:
+      - "stack=observability"
+      - "tier=metrics"
+
+  # Loki - Agregação de Logs
+  loki:
+    image: grafana/loki:2.9.1
+    container_name: loki
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+    networks:
+      - crm-network
+    restart: unless-stopped
+    labels:
+      - "stack=observability"
+      - "tier=logs"
+
+  # Promtail - Coleta de Logs dos Containers
+  promtail:
+    image: grafana/promtail:2.9.1
+    container_name: promtail
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/config.yml
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - crm-network
+    restart: unless-stopped
+    depends_on:
+      - loki
+    labels:
+      - "stack=observability"
+      - "tier=logs"
+
+  # Grafana - Visualização e Dashboards
+  grafana:
+    image: grafana/grafana-oss:10.1.2
+    container_name: grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "3002:3000"
+    networks:
+      - crm-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+      - loki
+    labels:
+      - "stack=observability"
+      - "tier=visualization"
+
+  # cAdvisor - Métricas de Containers
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    container_name: cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - "8080:8080"
+    networks:
+      - crm-network
+    restart: unless-stopped
+    labels:
+      - "stack=observability"
+      - "tier=metrics"
+
+  # ═══════════════════════════════════════════════════════════════
+  # CAMADA 5: SIMULAÇÃO AWS
+  # ═══════════════════════════════════════════════════════════════
+
+  # LocalStack - Simulação de Serviços AWS
+  localstack:
+    image: localstack/localstack:2.3
+    container_name: localstack
+    ports:
+      - "4566:4566"            # Porta principal para APIs da AWS
+      - "4510-4559:4510-4559"  # Portas para serviços específicos
+    environment:
+      - DEBUG=1
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - SERVICES=s3,sqs,sns,dynamodb,lambda
+      - DATA_DIR=/tmp/localstack/data
+    volumes:
+      - "${TMPDIR:-/tmp}/localstack:/tmp/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./localstack-init:/etc/localstack/init/ready.d"
+    networks:
+      - crm-network
+    restart: unless-stopped
+    labels:
+      - "stack=aws-simulation"
+      - "tier=cloud"
 
 # ═══════════════════════════════════════════════════════════════
-# 📝 DOCUMENTAÇÃO RÁPIDA
+# 📝 DOCUMENTAÇÃO
 # ═══════════════════════════════════════════════════════════════
-#
-# 🚀 COMANDOS PRINCIPAIS:
-#
-#   docker-compose up -d              # Iniciar CRM (padrão)
-#   docker-compose logs -f            # Ver logs
-#   docker-compose ps                 # Status
-#   docker-compose down               # Parar CRM
-#   docker-compose restart            # Reiniciar
-#
-# 📁 ARQUIVOS DISPONÍVEIS:
-#
-#   docker-compose.yml            ← Este arquivo (usa crm.yml)
-#   docker-compose.crm.yml        🎯 CRM Stack (API + LLM)
-#   docker-compose.frontend.yml   🌐 Frontend (produção)
-#   docker-compose.all.yml        🎁 Tudo junto
-#   docker-compose.test.yml       🧪 Testes
-#
-# 🎯 STACKS ESPECÍFICAS:
-#
-#   docker-compose -f docker-compose.crm.yml up -d
-#   docker-compose -f docker-compose.frontend.yml up -d
-#   docker-compose -f docker-compose.all.yml up -d
-#
-# 📊 PORTAS:
-#
+# 
+# PORTAS PRINCIPAIS:
+#   3000  - Frontend (Dev: npm run dev no next-app/)
+#   3001  - Frontend (Produção via Docker - comentado)
+#   3002  - Grafana (admin/admin)
+#   3100  - Loki
+#   4566  - LocalStack (AWS APIs)
 #   5000  - API de Dados
-#   8000  - LLM Service  
-#   3000  - Frontend (local: npm run dev)
-#   3001  - Frontend (Docker)
+#   8000  - LLM Service
+#   8080  - cAdvisor
+#   9090  - Prometheus
+#   11434 - Ollama
 #
-# 🔗 PRÉ-REQUISITOS (Devem estar rodando):
+# COMANDOS:
+#   docker-compose up -d                # Iniciar tudo
+#   docker-compose ps                   # Status
+#   docker-compose logs -f [service]    # Logs
+#   docker-compose down                 # Parar tudo
+#   docker-compose down -v              # Parar e remover volumes
 #
-#   • cnpj_postgres_final (PostgreSQL)
-#   • ollama (LLM Engine)
+# ACESSOS:
+#   Grafana:     http://localhost:3002 (admin/admin)
+#   Prometheus:  http://localhost:9090
+#   cAdvisor:    http://localhost:8080
+#   LocalStack:  http://localhost:4566
 #
-#   Iniciar: docker start cnpj_postgres_final ollama
-#
-# 📖 DOCUMENTAÇÃO COMPLETA:
-#
-#   GERENCIAR_CONTAINERS.md
+# DESENVOLVIMENTO:
+#   Frontend:    cd next-app && npm run dev
+#   Métricas:    http://localhost:3000/api/metrics
 #
 # ═══════════════════════════════════════════════════════════════
-

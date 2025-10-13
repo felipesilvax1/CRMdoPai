@@ -1,0 +1,34 @@
+# ═══════════════════════════════════════════════════════════════
+# Grafana Dashboards Configuration
+# ═══════════════════════════════════════════════════════════════
+
+apiVersion: 1
+
+providers:
+  # ═══════════════════════════════════════════════════════════════
+  # Dashboards do CRM
+  # ═══════════════════════════════════════════════════════════════
+  - name: 'CRM Dashboards'
+    orgId: 1
+    folder: 'CRM'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: true
+
+  # ═══════════════════════════════════════════════════════════════
+  # Dashboards de Sistema
+  # ═══════════════════════════════════════════════════════════════
+  - name: 'System Dashboards'
+    orgId: 1
+    folder: 'System'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/system
+

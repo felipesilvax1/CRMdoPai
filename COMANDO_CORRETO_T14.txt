@@ -33,3 +33,4 @@ docker run --rm -e PGPASSWORD=password -v D:\:/dump postgres:15 pg_dump -h 192.1
 
 (Este usa IP direto, sem compartilhar rede do container)
 
+

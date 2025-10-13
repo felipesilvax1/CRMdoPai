@@ -1,0 +1,111 @@
+# ═══════════════════════════════════════════════════════════════
+# Prometheus Configuration
+# ═══════════════════════════════════════════════════════════════
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'crm-dev'
+    environment: 'development'
+
+# Alertmanager configuration (opcional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: []
+
+# Regras de alerta (opcional)
+# rule_files:
+#   - "alerts/*.yml"
+
+scrape_configs:
+  # ═══════════════════════════════════════════════════════════════
+  # Prometheus - Auto-monitoramento
+  # ═══════════════════════════════════════════════════════════════
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+          tier: 'metrics'
+
+  # ═══════════════════════════════════════════════════════════════
+  # cAdvisor - Métricas de Containers Docker
+  # ═══════════════════════════════════════════════════════════════
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          service: 'cadvisor'
+          tier: 'metrics'
+
+  # ═══════════════════════════════════════════════════════════════
+  # CRM API - Métricas da Aplicação
+  # ═══════════════════════════════════════════════════════════════
+  - job_name: 'crm-api'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['crm-api:5000']
+        labels:
+          service: 'crm-api'
+          tier: 'backend'
+    scrape_interval: 10s
+
+  # ═══════════════════════════════════════════════════════════════
+  # CRM LLM - Métricas do Serviço LLM
+  # ═══════════════════════════════════════════════════════════════
+  - job_name: 'crm-llm'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['crm-llm:8000']
+        labels:
+          service: 'crm-llm'
+          tier: 'backend'
+    scrape_interval: 10s
+
+  # ═══════════════════════════════════════════════════════════════
+  # Frontend Next.js - Métricas da Aplicação
+  # ═══════════════════════════════════════════════════════════════
+  # Descomentar quando rodar frontend via Docker
+  # - job_name: 'crm-frontend'
+  #   metrics_path: '/api/metrics'
+  #   static_configs:
+  #     - targets: ['crm-frontend:3000']
+  #       labels:
+  #         service: 'crm-frontend'
+  #         tier: 'frontend'
+  #   scrape_interval: 10s
+
+  # Para desenvolvimento local (npm run dev)
+  - job_name: 'crm-frontend-dev'
+    metrics_path: '/api/metrics'
+    static_configs:
+      - targets: ['host.docker.internal:3000']
+        labels:
+          service: 'crm-frontend'
+          tier: 'frontend'
+          environment: 'development'
+    scrape_interval: 10s
+
+  # ═══════════════════════════════════════════════════════════════
+  # PostgreSQL - Métricas do Banco de Dados
+  # ═══════════════════════════════════════════════════════════════
+  # Requer postgres_exporter
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+  #       labels:
+  #         service: 'postgres'
+  #         tier: 'database'
+
+  # ═══════════════════════════════════════════════════════════════
+  # Node Exporter - Métricas do Host (opcional)
+  # ═══════════════════════════════════════════════════════════════
+  # - job_name: 'node'
+  #   static_configs:
+  #     - targets: ['node-exporter:9100']
+  #       labels:
+  #         service: 'node-exporter'
+  #         tier: 'infrastructure'
+
