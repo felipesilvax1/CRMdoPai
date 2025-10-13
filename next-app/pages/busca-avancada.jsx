@@ -195,31 +195,32 @@ export default function BuscaAvancada() {
             {/* Município */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Município
+                Município (Código IBGE) {ufSelecionada && <span className="text-xs text-gray-500">- {ufSelecionada}</span>}
               </label>
-              <input
-                type="text"
-                placeholder="Digite para buscar..."
-                value={municipiosBusca}
-                onChange={(e) => {
-                  setMunicipiosBusca(e.target.value);
-                  buscarMunicipioPorNome(e.target.value);
-                }}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-              {municipios.length > 0 && (
-                <select
-                  value={municipioSelecionado}
-                  onChange={(e) => setMunicipioSelecionado(e.target.value)}
-                  className="w-full mt-2 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  size="3"
-                >
-                  {municipios.map((m) => (
-                    <option key={m.codigo} value={m.codigo}>
-                      {m.descricao}
-                    </option>
-                  ))}
-                </select>
+              <select
+                value={municipioSelecionado}
+                onChange={(e) => setMunicipioSelecionado(e.target.value)}
+                disabled={!ufSelecionada}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="">
+                  {ufSelecionada ? 'Todos os municípios' : 'Selecione um estado primeiro'}
+                </option>
+                {municipios.map((m) => (
+                  <option key={m.codigo} value={m.codigo}>
+                    {m.codigo} - {m.total.toLocaleString()} empresas
+                  </option>
+                ))}
+              </select>
+              {ufSelecionada && municipios.length > 0 && (
+                <p className="text-xs text-gray-400 mt-1">
+                  📊 Top {municipios.length} municípios de {ufSelecionada} (ordenados por quantidade)
+                </p>
+              )}
+              {!ufSelecionada && (
+                <p className="text-xs text-gray-400 mt-1">
+                  ℹ️ Selecione um estado para ver os municípios
+                </p>
               )}
             </div>
 

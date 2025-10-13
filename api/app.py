@@ -88,23 +88,42 @@ def get_ufs():
 
 @app.route('/filtros/municipios', methods=['GET'])
 def get_municipios():
-    """Retorna lista de municípios (com paginação e busca)"""
+    """Retorna lista de municípios (códigos IBGE)"""
     try:
         uf = request.args.get('uf', '')
-        busca = request.args.get('busca', '')
         
         if uf:
-            # Municípios de uma UF específica
-            sql = f"SELECT DISTINCT m.codigo, m.descricao FROM municipios m JOIN estabelecimentos e ON e.municipio = m.codigo WHERE e.uf = '{uf}' ORDER BY m.descricao LIMIT 100"
-        elif busca:
-            # Busca por nome
-            sql = f"SELECT codigo, descricao FROM municipios WHERE descricao ILIKE '%{busca}%' ORDER BY descricao LIMIT 50"
+            # Municípios de uma UF específica (sem JOIN - tabela municipios vazia)
+            sql = f"""
+                SELECT DISTINCT 
+                    municipio as codigo,
+                    municipio as descricao,
+                    COUNT(*) as total
+                FROM estabelecimentos 
+                WHERE uf = '{uf}' AND municipio IS NOT NULL AND municipio != ''
+                GROUP BY municipio
+                ORDER BY total DESC
+                LIMIT 100
+            """
         else:
-            # Todos (limitado)
-            sql = "SELECT codigo, descricao FROM municipios ORDER BY descricao LIMIT 100"
+            # Top municípios do Brasil (sem UF)
+            sql = """
+                SELECT DISTINCT 
+                    municipio as codigo,
+                    municipio as descricao,
+                    COUNT(*) as total
+                FROM estabelecimentos 
+                WHERE municipio IS NOT NULL AND municipio != ''
+                GROUP BY municipio
+                ORDER BY total DESC
+                LIMIT 100
+            """
         
         result = executar_sql(sql)
-        return jsonify({"municipios": result})
+        return jsonify({
+            "municipios": result,
+            "nota": "Códigos IBGE - Tabela de nomes em migração"
+        })
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
