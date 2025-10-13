@@ -1,0 +1,70 @@
+# Banco de dados (MUITO GRANDE - 32GB)
+*.db
+*.sqlite
+*.sqlite3
+CNPJ_Processado.db
+
+# Dumps e backups
+dump/
+*.dump
+*.backup
+*.sql
+dump_*.csv
+
+# Node.js
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+*.egg-info/
+
+# Dados da Receita Federal (MUITO GRANDE)
+Dados Abertos CNPJ/
+*.zip
+*.csv
+!cache_coordenadas_rua.csv
+*.xlsx
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Temporários
+*.tmp
+*.temp
+diagnostico_*.txt
+log_*.txt
+
+# Mapas HTML
+mapa_*.html
+
+# Environment
+.env
+.env.local
+.env*.local
+
+# Docker
+.dockerignore
+
+# Arquivos muito grandes ou específicos
+*.pdf
+Pre Report.sqbpro
