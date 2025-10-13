@@ -153,3 +153,4 @@ A cópia de arquivo é **MUITO mais rápida** que streaming SQL:
 
 **O truque é fazer dump LOCALMENTE no T14 primeiro!** 🎯
 
+

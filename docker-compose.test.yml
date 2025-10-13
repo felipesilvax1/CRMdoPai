@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  # PostgreSQL para testes
+  test-db:
+    image: postgres:15
+    container_name: crm-test-db
+    environment:
+      POSTGRES_DB: test_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: test_password
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-network
+
+  # API de Dados - Testes
+  test-api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: crm-test-api
+    ports:
+      - "5001:5000"
+    environment:
+      - DB_HOST=test-db
+      - DB_PORT=5432
+      - DB_NAME=test_db
+      - DB_USER=postgres
+      - DB_PASSWORD=test_password
+      - USE_POSTGRES=true
+    depends_on:
+      test-db:
+        condition: service_healthy
+    networks:
+      - test-network
+    command: >
+      sh -c "sleep 5 && 
+             pip install pytest pytest-cov pytest-mock &&
+             pytest tests/ -v --cov=. --cov-report=term ||
+             python app.py"
+
+  # LLM Service - Testes (sem Ollama real)
+  test-llm:
+    build:
+      context: ./llm-service
+      dockerfile: Dockerfile
+    container_name: crm-test-llm
+    ports:
+      - "8001:8000"
+    environment:
+      - DB_HOST=test-db
+      - DB_PORT=5432
+      - DB_NAME=test_db
+      - DB_USER=postgres
+      - DB_PASSWORD=test_password
+      - OLLAMA_HOST=http://mock-ollama:11434
+    depends_on:
+      test-db:
+        condition: service_healthy
+    networks:
+      - test-network
+    command: >
+      sh -c "sleep 5 && 
+             pip install pytest pytest-cov pytest-mock &&
+             pytest tests/ -v --cov=. --cov-report=term ||
+             python llm_api.py"
+
+  # Mock do Ollama (para testes sem LLM real)
+  mock-ollama:
+    image: nginx:alpine
+    container_name: crm-mock-ollama
+    ports:
+      - "11435:80"
+    networks:
+      - test-network
+    volumes:
+      - ./tests/mock-ollama-response.json:/usr/share/nginx/html/api/tags:ro
+
+networks:
+  test-network:
+    driver: bridge
+

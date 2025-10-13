@@ -275,3 +275,4 @@ Para problemas ou sugestões:
 **Status Atual**: ✅ Frontend + API funcionando com SQLite
 **Próximo**: Migração para PostgreSQL (opcional)
 
+

@@ -92,3 +92,4 @@ Os comandos `git` e `gh` foram instalados, mas o PowerShell atual não reconhece
 
 **Feito em 3 cliques!** 🚀
 
+

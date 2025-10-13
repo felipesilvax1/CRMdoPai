@@ -86,12 +86,26 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-          <button
-            onClick={handleSignOut}
-            className="px-4 py-2 font-semibold text-white bg-red-600 rounded-md hover:bg-red-700"
-          >
-            Sair
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => router.push('/chat-llm')}
+              className="px-4 py-2 font-semibold text-white bg-purple-600 rounded-md hover:bg-purple-700"
+            >
+              🤖 Chat LLM
+            </button>
+            <button
+              onClick={() => router.push('/configuracoes')}
+              className="px-4 py-2 font-semibold text-white bg-gray-700 rounded-md hover:bg-gray-600"
+            >
+              ⚙️ Config
+            </button>
+            <button
+              onClick={handleSignOut}
+              className="px-4 py-2 font-semibold text-white bg-red-600 rounded-md hover:bg-red-700"
+            >
+              Sair
+            </button>
+          </div>
         </header>
 
         {!apiStatus?.success && !loading && (

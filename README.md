@@ -93,3 +93,4 @@ docker compose down -v
 - O Supabase deve estar inicializado (`npx supabase start`)
 - Certifique-se de que todas as portas necessárias estão disponíveis
 
+

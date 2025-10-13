@@ -85,3 +85,4 @@ TEMPO ESTIMADO: $([math]::Round($tempoHoras, 1)) horas
 
 Write-Host "Relatorio salvo em: diagnostico_resultado.txt`n"
 
+

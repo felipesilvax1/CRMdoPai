@@ -271,3 +271,4 @@ Se encontrar problemas ou tiver sugestões, me avise!
 **Data:** 13/10/2025  
 **Variável:** `NEXT_PUBLIC_DEV_MODE=true`
 
+

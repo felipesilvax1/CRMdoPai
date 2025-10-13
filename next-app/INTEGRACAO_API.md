@@ -375,3 +375,4 @@ Ao adicionar novos recursos:
 **Desenvolvido para:** CRM Project
 **Stack:** Next.js 14 + Python Flask + PostgreSQL + Supabase Auth
 
+

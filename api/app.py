@@ -57,12 +57,21 @@ def gerar_sql_simples(pergunta: str) -> str:
             (SELECT COUNT(*) FROM cnaes) as total_cnaes
         """
     
-    if 'empresa' in pergunta_lower or 'razao' in pergunta_lower:
+    if 'empresa' in pergunta_lower or 'razao' in pergunta_lower or 'estabelecimento' in pergunta_lower:
         return """
-        SELECT "cnpj basico", "razao social", "porte empresa" 
-        FROM empresas 
-        WHERE "razao social" IS NOT NULL
-        LIMIT 20
+        SELECT 
+            cnpj_basico,
+            cnpj_ordem,
+            cnpj_dv,
+            nome_fantasia,
+            situacao_cadastral,
+            cnae_fiscal_principal,
+            municipio,
+            uf
+        FROM estabelecimentos 
+        WHERE nome_fantasia IS NOT NULL 
+        AND nome_fantasia != ''
+        LIMIT 50
         """
     
     return "SELECT 'Teste' as resultado"

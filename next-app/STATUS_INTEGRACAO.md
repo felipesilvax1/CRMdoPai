@@ -323,3 +323,4 @@ Se tiver problemas:
 **Data:** 13/10/2025  
 **Versão:** 1.0.0
 
+

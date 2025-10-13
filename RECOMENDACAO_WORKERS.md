@@ -192,3 +192,4 @@ Get-WmiObject Win32_PhysicalMemory |
 **Atualizado:** 13/10/2025 00:15  
 **Recomendação padrão:** `-j 4` ou `-j 6` (seguro para maioria dos casos)
 
+

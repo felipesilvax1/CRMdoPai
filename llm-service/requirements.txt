@@ -1,0 +1,12 @@
+flask==3.0.0
+flask-cors==4.0.0
+langchain
+langchain-community
+langchain-ollama
+sqlalchemy
+psycopg2-binary
+pandas
+reportlab
+python-dotenv
+requests
+

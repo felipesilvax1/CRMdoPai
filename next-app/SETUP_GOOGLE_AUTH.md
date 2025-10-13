@@ -176,3 +176,4 @@ Quando você fizer deploy da aplicação:
 - Client ID e Client Secret do Google devem ficar apenas no Supabase Dashboard
 - Use variáveis de ambiente em produção
 
+

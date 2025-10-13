@@ -179,3 +179,4 @@ docker compose up --build
 **Sessão:** ~3 horas de trabalho  
 **Status:** Sistema funcional, aguardando desenvolvimento do frontend
 
+

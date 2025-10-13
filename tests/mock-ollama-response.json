@@ -1,0 +1,18 @@
+{
+  "models": [
+    {
+      "name": "gemma:latest",
+      "model": "gemma:latest",
+      "modified_at": "2024-01-01T00:00:00Z",
+      "size": 1000000,
+      "digest": "mock-digest",
+      "details": {
+        "format": "gguf",
+        "family": "gemma",
+        "parameter_size": "2B",
+        "quantization_level": "Q4_0"
+      }
+    }
+  ]
+}
+
