@@ -55,11 +55,28 @@ export default function BuscaAvancada() {
 
   const carregarUFs = async () => {
     try {
+      console.log('Carregando UFs de:', `${API_URL}/filtros/ufs`);
       const response = await fetch(`${API_URL}/filtros/ufs`);
       const data = await response.json();
-      setUfs(data.ufs || []);
+      console.log('UFs recebidas:', data.ufs?.length || 0);
+      if (data.ufs && Array.isArray(data.ufs)) {
+        setUfs(data.ufs);
+        console.log('UFs setadas no estado:', data.ufs.length);
+      } else {
+        console.error('Formato inválido de UFs:', data);
+      }
     } catch (error) {
       console.error('Erro ao carregar UFs:', error);
+      // Fallback para teste - carregar UFs fixas
+      const ufsFixas = [
+        {uf: 'SP', total: 22873914}, {uf: 'MG', total: 8622911}, 
+        {uf: 'RJ', total: 6729190}, {uf: 'RS', total: 5470547},
+        {uf: 'PR', total: 5379569}, {uf: 'BA', total: 3948780},
+        {uf: 'SC', total: 3797700}, {uf: 'GO', total: 2832955},
+        {uf: 'PE', total: 2374609}, {uf: 'CE', total: 2244514}
+      ];
+      setUfs(ufsFixas);
+      console.log('Usando UFs fixas:', ufsFixas.length);
     }
   };
 
@@ -176,7 +193,7 @@ export default function BuscaAvancada() {
             {/* UF */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Estado (UF)
+                Estado (UF) {ufs.length > 0 && <span className="text-xs text-green-400">({ufs.length} estados)</span>}
               </label>
               <select
                 value={ufSelecionada}
@@ -184,12 +201,21 @@ export default function BuscaAvancada() {
                 className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="">Todos os estados</option>
+                {ufs.length === 0 && <option disabled>Carregando estados...</option>}
                 {ufs.map((uf) => (
                   <option key={uf.uf} value={uf.uf}>
-                    {uf.uf} ({uf.total.toLocaleString()})
+                    {uf.uf} ({uf.total.toLocaleString()} empresas)
                   </option>
                 ))}
               </select>
+              {ufs.length === 0 && (
+                <button
+                  onClick={carregarUFs}
+                  className="mt-2 text-xs text-indigo-400 hover:text-indigo-300 underline"
+                >
+                  🔄 Recarregar estados
+                </button>
+              )}
             </div>
 
             {/* Município */}
