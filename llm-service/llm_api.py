@@ -9,6 +9,7 @@ import os
 import pandas as pd
 from io import BytesIO
 import base64
+from data_dictionary import get_data_dictionary
 
 app = Flask(__name__)
 CORS(app)
@@ -98,52 +99,56 @@ def ask_question():
         from langchain_core.output_parsers import StrOutputParser
         from sqlalchemy import text as sql_text
         
-        # Prompt otimizado para PostgreSQL com exemplos e códigos
-        PROMPT_TEMPLATE = """Dada uma pergunta do usuário, crie uma consulta SQL para PostgreSQL sintaticamente correta.
+        # Obter dicionário de dados completo
+        data_dict = get_data_dictionary()
+        
+        # Prompt otimizado com dicionário de dados completo
+        PROMPT_TEMPLATE = """Você é um especialista em SQL para PostgreSQL. Use o DICIONÁRIO DE DADOS abaixo para entender EXATAMENTE como o banco está estruturado.
 
-REGRAS IMPORTANTES:
-- Use APENAS nomes de colunas com underscore (ex: cnpj_basico, razao_social, nome_fantasia)
-- NÃO use aspas duplas nos nomes das colunas
-- Para perguntas com "QUANTOS", "QUANTO", "TOTAL" use COUNT(*)
-- Para perguntas com "MOSTRE", "LISTE", "QUAIS" use SELECT * LIMIT {top_k}
-- SEMPRE adicione LIMIT para evitar sobrecarga
-- NÃO use WHERE uf = 'BR' (Brasil não é UF válida)
-- Para "ativos" ou "ativas" use: situacao_cadastral = '02'
-- Para todo o Brasil, NÃO use filtro de UF
+{data_dictionary}
 
-CÓDIGOS IMPORTANTES:
-- situacao_cadastral: '01'=Nula, '02'=Ativa, '03'=Suspensa, '04'=Inapta, '08'=Baixada
-- UFs válidas: SP, RJ, MG, RS, PR, SC, BA, etc (NUNCA use 'BR')
+REGRAS CRÍTICAS:
+1. Coluna 'municipio' é CÓDIGO IBGE, NÃO é nome da cidade!
+   - Para buscar por nome de cidade: USE JOIN com tabela municipios
+   - Exemplo: "empresas em Barueri" → JOIN municipios WHERE nome ILIKE '%Barueri%'
 
-EXEMPLOS:
-Pergunta: "Quantos estabelecimentos temos em SP?"
-SQL: SELECT COUNT(*) FROM estabelecimentos WHERE uf = 'SP';
+2. Coluna 'situacao_cadastral' é CÓDIGO:
+   - Para "ativos/ativas" → situacao_cadastral = '02'
+   - NUNCA use 'Ativa' ou 'Ativo' (é código numérico!)
 
-Pergunta: "Quantos estabelecimentos ativos no Brasil?"
+3. UF é sigla do estado (SP, RJ, MG...):
+   - NUNCA use 'BR' ou 'Brasil' como UF
+   - Para todo o Brasil, NÃO use filtro de UF
+
+4. Para perguntas com "QUANTOS/QUANTO" → use COUNT(*)
+5. Para perguntas com "MOSTRE/LISTE" → use SELECT * LIMIT {top_k}
+
+EXEMPLOS DE QUERIES CORRETAS:
+
+Pergunta: "Quantos estabelecimentos em Barueri SP?"
+SQL: SELECT COUNT(*) FROM estabelecimentos e JOIN municipios m ON e.municipio = m.codigo WHERE m.descricao ILIKE '%BARUERI%' AND e.uf = 'SP';
+
+Pergunta: "Empresas ativas em São Paulo cidade"
+SQL: SELECT e.* FROM estabelecimentos e JOIN municipios m ON e.municipio = m.codigo WHERE m.descricao ILIKE '%SAO PAULO%' AND e.uf = 'SP' AND e.situacao_cadastral = '02' LIMIT {top_k};
+
+Pergunta: "Quantos ativos no Brasil?"
 SQL: SELECT COUNT(*) FROM estabelecimentos WHERE situacao_cadastral = '02';
 
-Pergunta: "Quantos ativos em SP?"
-SQL: SELECT COUNT(*) FROM estabelecimentos WHERE uf = 'SP' AND situacao_cadastral = '02';
-
-Pergunta: "Mostre empresas de SP"  
-SQL: SELECT * FROM estabelecimentos WHERE uf = 'SP' LIMIT {top_k};
-
-Pergunta: "Liste os CNAEs mais comuns"
-SQL: SELECT cnae_fiscal_principal, COUNT(*) as total FROM estabelecimentos GROUP BY cnae_fiscal_principal ORDER BY total DESC LIMIT {top_k};
-
-Esquema do banco de dados:
+Esquema técnico adicional:
 {table_info}
 
-Pergunta: {input}
-Consulta SQL PostgreSQL (apenas o SQL, sem explicações):"""
+Pergunta do usuário: {input}
+
+Consulta SQL PostgreSQL (apenas SQL puro, sem markdown nem explicações):"""
         
         prompt = PromptTemplate(
-            input_variables=["input", "table_info", "top_k"],
-            template=PROMPT_TEMPLATE
+            input_variables=["input", "table_info", "top_k", "data_dictionary"],
+            template=PROMPT_TEMPLATE,
+            partial_variables={"data_dictionary": data_dict}
         )
         
         # Gerar SQL
-        print("[LLM] 🤖 Gemma está gerando SQL... (usando GPU)", flush=True)
+        print("[LLM] 🤖 Gemma está gerando SQL... (usando GPU + Dicionário de Dados)", flush=True)
         generate_query_chain = create_sql_query_chain(llm, db, prompt=prompt)
         sql_query = generate_query_chain.invoke({"question": pergunta})
         print("[LLM] ✅ SQL gerado!", flush=True)

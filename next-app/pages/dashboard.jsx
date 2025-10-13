@@ -88,6 +88,12 @@ export default function Dashboard() {
           </div>
           <div className="flex gap-3">
             <button
+              onClick={() => router.push('/busca-avancada')}
+              className="px-4 py-2 font-semibold text-white bg-green-600 rounded-md hover:bg-green-700"
+            >
+              🔍 Busca
+            </button>
+            <button
               onClick={() => router.push('/chat-llm')}
               className="px-4 py-2 font-semibold text-white bg-purple-600 rounded-md hover:bg-purple-700"
             >

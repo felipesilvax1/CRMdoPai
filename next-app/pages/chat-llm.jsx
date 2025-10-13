@@ -199,11 +199,44 @@ export default function ChatLLM() {
           {messages.length === 0 && (
             <div className="text-center py-12 text-gray-400">
               <p className="text-lg mb-4">💬 Faça uma pergunta sobre seus dados em linguagem natural!</p>
+              
+              <div className="mb-6 p-4 bg-blue-900 border border-blue-700 rounded-md text-left max-w-2xl mx-auto">
+                <p className="text-sm text-blue-200 mb-3">
+                  💡 <strong>Dica:</strong> Para buscas simples, use a <strong>Busca Avançada</strong> (mais rápida e gratuita). 
+                  Use o LLM para queries complexas!
+                </p>
+                <button
+                  onClick={() => router.push('/busca-avancada')}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-md text-white font-semibold"
+                >
+                  🔍 Ir para Busca Avançada
+                </button>
+              </div>
+              
               <div className="text-sm space-y-2">
-                <p>Exemplos:</p>
-                <p className="text-gray-500">"Quantos estabelecimentos temos em São Paulo?"</p>
-                <p className="text-gray-500">"Mostre as empresas mais recentes"</p>
-                <p className="text-gray-500">"Liste os CNAEs mais comuns"</p>
+                <p className="font-semibold text-white mb-3">📝 Exemplos de perguntas para o LLM:</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-w-3xl mx-auto text-left">
+                  <div className="bg-gray-800 p-3 rounded-md border border-gray-700">
+                    <p className="text-green-400">✅ "Quantos estabelecimentos ativos no Brasil?"</p>
+                  </div>
+                  <div className="bg-gray-800 p-3 rounded-md border border-gray-700">
+                    <p className="text-green-400">✅ "Empresas em Barueri SP"</p>
+                    <p className="text-xs text-gray-500 mt-1">Usa JOIN automático</p>
+                  </div>
+                  <div className="bg-gray-800 p-3 rounded-md border border-gray-700">
+                    <p className="text-green-400">✅ "CNAEs mais comuns em MG"</p>
+                  </div>
+                  <div className="bg-gray-800 p-3 rounded-md border border-gray-700">
+                    <p className="text-green-400">✅ "Top 10 cidades com mais empresas"</p>
+                  </div>
+                </div>
+                
+                <div className="mt-4 p-3 bg-gray-800 rounded-md border border-gray-700 max-w-2xl mx-auto">
+                  <p className="text-xs text-gray-400">
+                    ⚠️ <strong>Primeira pergunta demora ~2 minutos</strong> (carregando Gemma). 
+                    Próximas: 10-30 segundos.
+                  </p>
+                </div>
               </div>
             </div>
           )}
