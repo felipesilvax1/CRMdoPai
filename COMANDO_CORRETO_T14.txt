@@ -1,0 +1,35 @@
+================================================================
+COMANDO CORRETO - DUMP DIRETO NO SSD EXTERNO (D:)
+================================================================
+
+NO T14, execute este comando UNICO:
+
+docker run --rm -e PGPASSWORD=password --network container:c93d7f48cac6 -v D:\:/dump postgres:15 pg_dump -h localhost -U postgres -d cnpj_processed -Fd -j 8 -f /dump/dump_cnpj_processed --verbose
+
+================================================================
+
+O QUE ESTE COMANDO FAZ:
+
+1. Cria container temporario PostgreSQL client
+2. Conecta na MESMA rede do container c93d7f48cac6
+3. Monta D:\ (SSD externo) como /dump dentro do container
+4. Faz dump DIRETO no D:\ (SEM usar espaco do C:)
+5. Usa 8 threads em paralelo
+6. Remove container ao terminar
+
+Resultado: D:\dump_cnpj_processed (15-25 GB)
+
+================================================================
+
+TEMPO: 15-25 minutos
+
+Quando terminar, DESCONECTE o SSD e traga para o PC!
+
+================================================================
+
+ALTERNATIVA - Se der erro de network:
+
+docker run --rm -e PGPASSWORD=password -v D:\:/dump postgres:15 pg_dump -h 192.168.15.25 -U postgres -d cnpj_processed -Fd -j 8 -f /dump/dump_cnpj_processed --verbose
+
+(Este usa IP direto, sem compartilhar rede do container)
+

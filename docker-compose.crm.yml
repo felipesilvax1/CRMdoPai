@@ -1,0 +1,94 @@
+# ═══════════════════════════════════════════════════════════════
+# 🎯 CRM Stack - Serviços Principais da Aplicação
+# ═══════════════════════════════════════════════════════════════
+
+version: '3.8'
+
+networks:
+  crm-network:
+    driver: bridge
+    name: crm-network
+
+services:
+  # ═══════════════════════════════════════════════════════════════
+  # 📊 API de Dados - Consultas PostgreSQL
+  # ═══════════════════════════════════════════════════════════════
+  crm-api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: crm-api
+    hostname: crm-api
+    ports:
+      - "5000:5000"
+    environment:
+      - DB_HOST=cnpj_postgres_final
+      - DB_PORT=5432
+      - DB_NAME=cnpj_processed
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - USE_POSTGRES=true
+    external_links:
+      - cnpj_postgres_final
+    networks:
+      - crm-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "app=crm"
+      - "tier=api"
+      - "description=API de dados PostgreSQL"
+
+  # ═══════════════════════════════════════════════════════════════
+  # 🤖 LLM Service - Chat IA (LangChain + Gemma)
+  # ═══════════════════════════════════════════════════════════════
+  crm-llm:
+    build:
+      context: ./llm-service
+      dockerfile: Dockerfile
+    container_name: crm-llm
+    hostname: crm-llm
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=cnpj_postgres_final
+      - DB_PORT=5432
+      - DB_NAME=cnpj_processed
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - OLLAMA_HOST=http://ollama:11434
+    external_links:
+      - cnpj_postgres_final
+      - ollama
+    networks:
+      - crm-network
+    restart: unless-stopped
+    depends_on:
+      - crm-api
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "app=crm"
+      - "tier=llm"
+      - "description=LLM Service com Gemma via Ollama"
+
+# ═══════════════════════════════════════════════════════════════
+# 📝 NOTAS:
+# - cnpj_postgres_final: Container externo (gerenciado separadamente)
+# - ollama: Container externo (gerenciado separadamente)
+# - Frontend Next.js: Roda localmente (npm run dev) ou usar docker-compose.frontend.yml
+# ═══════════════════════════════════════════════════════════════
+
+# 🚀 COMANDOS ÚTEIS:
+# docker-compose -f docker-compose.crm.yml up -d      # Iniciar CRM
+# docker-compose -f docker-compose.crm.yml logs -f    # Ver logs
+# docker-compose -f docker-compose.crm.yml down       # Parar CRM
+# docker-compose -f docker-compose.crm.yml ps         # Status
+

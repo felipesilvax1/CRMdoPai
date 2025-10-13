@@ -1,0 +1,46 @@
+# ═══════════════════════════════════════════════════════════════
+# ⚛️ Frontend Stack - Next.js (Opcional - Produção)
+# ═══════════════════════════════════════════════════════════════
+# Para desenvolvimento local, use: cd next-app && npm run dev
+# Este compose é para deploy em produção
+# ═══════════════════════════════════════════════════════════════
+
+version: '3.8'
+
+networks:
+  crm-network:
+    external: true
+    name: crm-network
+
+services:
+  # ═══════════════════════════════════════════════════════════════
+  # 🌐 Frontend Next.js - Interface Web
+  # ═══════════════════════════════════════════════════════════════
+  crm-frontend:
+    build:
+      context: ./next-app
+      dockerfile: ../Dockerfile
+    container_name: crm-frontend
+    hostname: crm-frontend
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://crm-api:5000
+      - NEXT_PUBLIC_LLM_URL=http://crm-llm:8000
+      - NEXT_PUBLIC_DEV_MODE=false
+    networks:
+      - crm-network
+    restart: unless-stopped
+    depends_on:
+      - crm-api
+      - crm-llm
+    labels:
+      - "app=crm"
+      - "tier=frontend"
+      - "description=Frontend Next.js"
+
+# 🚀 COMANDOS:
+# docker-compose -f docker-compose.frontend.yml up -d    # Iniciar frontend
+# docker-compose -f docker-compose.frontend.yml down     # Parar frontend
+

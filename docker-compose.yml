@@ -1,64 +1,58 @@
-services:
-  # API de Dados (PostgreSQL)
-  api:
-    build:
-      context: ./api
-      dockerfile: Dockerfile
-    container_name: crm-api
-    ports:
-      - "5000:5000"
-    environment:
-      - DB_HOST=cnpj_postgres_final
-      - DB_PORT=5432
-      - DB_NAME=cnpj_processed
-      - DB_USER=postgres
-      - DB_PASSWORD=password
-      - USE_POSTGRES=true
-    external_links:
-      - cnpj_postgres_final
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-    network_mode: bridge
+# ═══════════════════════════════════════════════════════════════
+# 🎯 CRM - Docker Compose Principal
+# ═══════════════════════════════════════════════════════════════
+# ESTE É O ARQUIVO PADRÃO - USA A STACK ORGANIZADA
+# ═══════════════════════════════════════════════════════════════
 
-  # LLM Service (LangChain + Gemma via Ollama)
-  llm-service:
-    build:
-      context: ./llm-service
-      dockerfile: Dockerfile
-    container_name: crm-llm
-    ports:
-      - "8000:8000"
-    environment:
-      - DB_HOST=cnpj_postgres_final
-      - DB_PORT=5432
-      - DB_NAME=cnpj_processed
-      - DB_USER=postgres
-      - DB_PASSWORD=password
-      - OLLAMA_HOST=http://ollama:11434
-    external_links:
-      - cnpj_postgres_final
-      - ollama
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-    network_mode: bridge
-    depends_on:
-      - api
+version: '3.8'
 
-  # Frontend Next.js (Opcional - para produção)
-  next-app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: crm-frontend
-    ports:
-      - "3001:3000"
-    environment:
-      - NODE_ENV=production
-      - NEXT_PUBLIC_API_URL=http://localhost:5000
-      - NEXT_PUBLIC_LLM_URL=http://localhost:8000
-    depends_on:
-      - api
-      - llm-service
-    restart: unless-stopped
+# Incluir CRM Stack (API + LLM)
+include:
+  - docker-compose.crm.yml
+
+# ═══════════════════════════════════════════════════════════════
+# 📝 DOCUMENTAÇÃO RÁPIDA
+# ═══════════════════════════════════════════════════════════════
+#
+# 🚀 COMANDOS PRINCIPAIS:
+#
+#   docker-compose up -d              # Iniciar CRM (padrão)
+#   docker-compose logs -f            # Ver logs
+#   docker-compose ps                 # Status
+#   docker-compose down               # Parar CRM
+#   docker-compose restart            # Reiniciar
+#
+# 📁 ARQUIVOS DISPONÍVEIS:
+#
+#   docker-compose.yml            ← Este arquivo (usa crm.yml)
+#   docker-compose.crm.yml        🎯 CRM Stack (API + LLM)
+#   docker-compose.frontend.yml   🌐 Frontend (produção)
+#   docker-compose.all.yml        🎁 Tudo junto
+#   docker-compose.test.yml       🧪 Testes
+#
+# 🎯 STACKS ESPECÍFICAS:
+#
+#   docker-compose -f docker-compose.crm.yml up -d
+#   docker-compose -f docker-compose.frontend.yml up -d
+#   docker-compose -f docker-compose.all.yml up -d
+#
+# 📊 PORTAS:
+#
+#   5000  - API de Dados
+#   8000  - LLM Service  
+#   3000  - Frontend (local: npm run dev)
+#   3001  - Frontend (Docker)
+#
+# 🔗 PRÉ-REQUISITOS (Devem estar rodando):
+#
+#   • cnpj_postgres_final (PostgreSQL)
+#   • ollama (LLM Engine)
+#
+#   Iniciar: docker start cnpj_postgres_final ollama
+#
+# 📖 DOCUMENTAÇÃO COMPLETA:
+#
+#   GERENCIAR_CONTAINERS.md
+#
+# ═══════════════════════════════════════════════════════════════
+

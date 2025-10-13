@@ -1,0 +1,190 @@
+# ═══════════════════════════════════════════════════════════════
+# 🎯 CRM COMPLETO - Todos os Serviços
+# ═══════════════════════════════════════════════════════════════
+# Use este arquivo para iniciar TUDO de uma vez
+# ═══════════════════════════════════════════════════════════════
+
+version: '3.8'
+
+networks:
+  crm-network:
+    driver: bridge
+    name: crm-network
+
+services:
+  # ═══════════════════════════════════════════════════════════════
+  # CAMADA 1: INFRAESTRUTURA
+  # ═══════════════════════════════════════════════════════════════
+  
+  # PostgreSQL - Banco de Dados Principal
+  postgres:
+    image: postgres:15
+    container_name: cnpj_postgres_final
+    hostname: cnpj-postgres
+    environment:
+      POSTGRES_DB: cnpj_processed
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - crm-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "stack=infrastructure"
+      - "tier=database"
+
+  # Ollama - LLM Engine (Gemma)
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    hostname: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - crm-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    labels:
+      - "stack=infrastructure"
+      - "tier=ai"
+
+  # ═══════════════════════════════════════════════════════════════
+  # CAMADA 2: BACKEND SERVICES
+  # ═══════════════════════════════════════════════════════════════
+  
+  # API de Dados
+  crm-api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: crm-api
+    hostname: crm-api
+    ports:
+      - "5000:5000"
+    environment:
+      - DB_HOST=cnpj-postgres
+      - DB_PORT=5432
+      - DB_NAME=cnpj_processed
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - USE_POSTGRES=true
+    networks:
+      - crm-network
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "stack=backend"
+      - "tier=api"
+
+  # LLM Service
+  crm-llm:
+    build:
+      context: ./llm-service
+      dockerfile: Dockerfile
+    container_name: crm-llm
+    hostname: crm-llm
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=cnpj-postgres
+      - DB_PORT=5432
+      - DB_NAME=cnpj_processed
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - OLLAMA_HOST=http://ollama:11434
+    networks:
+      - crm-network
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "stack=backend"
+      - "tier=llm"
+
+  # ═══════════════════════════════════════════════════════════════
+  # CAMADA 3: FRONTEND (Opcional - Produção)
+  # ═══════════════════════════════════════════════════════════════
+  
+  # Frontend Next.js
+  crm-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crm-frontend
+    hostname: crm-frontend
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://crm-api:5000
+      - NEXT_PUBLIC_LLM_URL=http://crm-llm:8000
+      - NEXT_PUBLIC_DEV_MODE=false
+    networks:
+      - crm-network
+    restart: unless-stopped
+    depends_on:
+      - crm-api
+      - crm-llm
+    labels:
+      - "stack=frontend"
+      - "tier=web"
+
+volumes:
+  postgres-data:
+    name: crm-postgres-data
+  ollama-data:
+    name: crm-ollama-data
+
+# ═══════════════════════════════════════════════════════════════
+# 📝 DOCUMENTAÇÃO
+# ═══════════════════════════════════════════════════════════════
+# 
+# PORTAS:
+#   3001 - Frontend (Produção)
+#   5000 - API de Dados
+#   8000 - LLM Service
+#   11434 - Ollama
+#   5432 - PostgreSQL (interno)
+#
+# COMANDOS:
+#   docker-compose -f docker-compose.all.yml up -d      # Tudo
+#   docker-compose -f docker-compose.all.yml ps         # Status
+#   docker-compose -f docker-compose.all.yml logs -f    # Logs
+#   docker-compose -f docker-compose.all.yml down       # Parar
+#
+# STACKS:
+#   - infrastructure: postgres, ollama
+#   - backend: crm-api, crm-llm
+#   - frontend: crm-frontend
+#
+# ═══════════════════════════════════════════════════════════════
+

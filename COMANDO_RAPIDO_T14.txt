@@ -1,0 +1,18 @@
+================================================================
+EXECUTE ESTE COMANDO NO T14 (POWERSHELL COMO ADMIN)
+================================================================
+
+docker exec c93d7f48cac6 pg_dump -U postgres -d cnpj_processed -Fd -j 8 -f /tmp/dump_cnpj --verbose
+
+================================================================
+
+Depois execute:
+
+docker cp c93d7f48cac6:/tmp/dump_cnpj D:\dump_cnpj_processed
+
+================================================================
+
+Tempo estimado: 15-25 minutos
+
+Quando terminar, DESCONECTE o SSD e traga para o PC principal!
+
