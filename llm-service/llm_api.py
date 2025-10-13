@@ -94,19 +94,31 @@ def ask_question():
         from langchain_core.output_parsers import StrOutputParser
         from sqlalchemy import text as sql_text
         
-        # Prompt otimizado para PostgreSQL
+        # Prompt otimizado para PostgreSQL com exemplos
         PROMPT_TEMPLATE = """Dada uma pergunta do usuário, crie uma consulta SQL para PostgreSQL sintaticamente correta.
 
-IMPORTANTE:
+REGRAS IMPORTANTES:
 - Use APENAS nomes de colunas com underscore (ex: cnpj_basico, razao_social, nome_fantasia)
 - NÃO use aspas duplas nos nomes das colunas
-- LIMITE sempre os resultados a {top_k} registros (máximo)
+- Para perguntas com "QUANTOS", "QUANTO", "TOTAL" use COUNT(*)
+- Para perguntas com "MOSTRE", "LISTE", "QUAIS" use SELECT * LIMIT {top_k}
+- SEMPRE adicione LIMIT para evitar sobrecarga
+
+EXEMPLOS:
+Pergunta: "Quantos estabelecimentos temos em SP?"
+SQL: SELECT COUNT(*) FROM estabelecimentos WHERE uf = 'SP';
+
+Pergunta: "Mostre empresas de SP"  
+SQL: SELECT * FROM estabelecimentos WHERE uf = 'SP' LIMIT {top_k};
+
+Pergunta: "Liste os CNAEs mais comuns"
+SQL: SELECT cnae_fiscal_principal, COUNT(*) as total FROM estabelecimentos GROUP BY cnae_fiscal_principal ORDER BY total DESC LIMIT {top_k};
 
 Esquema do banco de dados:
 {table_info}
 
 Pergunta: {input}
-Consulta SQL PostgreSQL:"""
+Consulta SQL PostgreSQL (apenas o SQL, sem explicações):"""
         
         prompt = PromptTemplate(
             input_variables=["input", "table_info", "top_k"],
@@ -116,6 +128,16 @@ Consulta SQL PostgreSQL:"""
         # Gerar SQL
         generate_query_chain = create_sql_query_chain(llm, db, prompt=prompt)
         sql_query = generate_query_chain.invoke({"question": pergunta})
+        
+        # Limpar markdown formatting (```sql ... ```)
+        sql_query = sql_query.strip()
+        if sql_query.startswith('```sql'):
+            sql_query = sql_query[6:]
+        if sql_query.startswith('```'):
+            sql_query = sql_query[3:]
+        if sql_query.endswith('```'):
+            sql_query = sql_query[:-3]
+        sql_query = sql_query.strip()
         
         print(f"[SQL] Gerado: {sql_query[:200]}...")
         
