@@ -64,6 +64,21 @@ export default function ChatLLM() {
 
     const userMessage = { role: 'user', content: input };
     setMessages(prev => [...prev, userMessage]);
+    
+    // Adicionar mensagem de "pensando"
+    const thinkingMessage = {
+      role: 'thinking',
+      content: '🤖 Gemma está processando...',
+      steps: [
+        '🔄 Inicializando LangChain...',
+        '🤖 Gerando SQL...',
+        '🔍 Executando no PostgreSQL...',
+        '💬 Formulando resposta...'
+      ],
+      currentStep: 0
+    };
+    setMessages(prev => [...prev, thinkingMessage]);
+    
     setInput('');
     setSending(true);
 
@@ -75,6 +90,9 @@ export default function ChatLLM() {
       });
 
       const data = await response.json();
+      
+      // Remover mensagem de "pensando"
+      setMessages(prev => prev.filter(m => m.role !== 'thinking'));
 
       if (data.sucesso) {
         const assistantMessage = {
@@ -195,10 +213,29 @@ export default function ChatLLM() {
               <div className={`max-w-3xl rounded-lg p-4 ${
                 msg.role === 'user' ? 'bg-indigo-600' :
                 msg.role === 'error' ? 'bg-red-900 border border-red-700' :
+                msg.role === 'thinking' ? 'bg-yellow-900 border border-yellow-700' :
                 'bg-gray-800 border border-gray-700'
               }`}>
                 {msg.role === 'user' && (
                   <p className="text-white">{msg.content}</p>
+                )}
+
+                {msg.role === 'thinking' && (
+                  <div className="space-y-2 text-yellow-200">
+                    <p className="font-semibold">{msg.content}</p>
+                    <div className="space-y-1 text-sm">
+                      {msg.steps.map((step, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <span className="text-yellow-400">•</span>
+                          <span>{step}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 flex items-center gap-2 text-sm">
+                      <div className="animate-spin h-4 w-4 border-2 border-yellow-400 border-t-transparent rounded-full"></div>
+                      <span>Processando (pode levar 10-30 segundos)...</span>
+                    </div>
+                  </div>
                 )}
 
                 {msg.role === 'assistant' && (

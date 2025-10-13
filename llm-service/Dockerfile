@@ -2,6 +2,9 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Desabilitar buffering do Python para logs em tempo real
+ENV PYTHONUNBUFFERED=1
+
 # Instalar dependências do sistema
 RUN apt-get update && apt-get install -y \
     curl \
@@ -21,5 +24,5 @@ COPY . .
 EXPOSE 8000
 
 # Comando de inicialização
-CMD ["python", "llm_api.py"]
+CMD ["python", "-u", "llm_api.py"]
 

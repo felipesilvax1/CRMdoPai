@@ -84,17 +84,21 @@ def ask_question():
         if not pergunta:
             return jsonify({"erro": "Nenhuma pergunta fornecida"}), 400
         
-        print(f"[LLM] Pergunta recebida: {pergunta}")
+        print(f"\n{'='*60}", flush=True)
+        print(f"[LLM] 📥 Pergunta recebida: {pergunta}", flush=True)
+        print(f"{'='*60}", flush=True)
         
         # Inicializar LangChain
+        print("[LLM] 🔄 Inicializando LangChain...", flush=True)
         llm, db = init_langchain()
+        print("[LLM] ✅ LangChain inicializado", flush=True)
         
         from langchain.chains import create_sql_query_chain
         from langchain.prompts import PromptTemplate
         from langchain_core.output_parsers import StrOutputParser
         from sqlalchemy import text as sql_text
         
-        # Prompt otimizado para PostgreSQL com exemplos
+        # Prompt otimizado para PostgreSQL com exemplos e códigos
         PROMPT_TEMPLATE = """Dada uma pergunta do usuário, crie uma consulta SQL para PostgreSQL sintaticamente correta.
 
 REGRAS IMPORTANTES:
@@ -103,10 +107,23 @@ REGRAS IMPORTANTES:
 - Para perguntas com "QUANTOS", "QUANTO", "TOTAL" use COUNT(*)
 - Para perguntas com "MOSTRE", "LISTE", "QUAIS" use SELECT * LIMIT {top_k}
 - SEMPRE adicione LIMIT para evitar sobrecarga
+- NÃO use WHERE uf = 'BR' (Brasil não é UF válida)
+- Para "ativos" ou "ativas" use: situacao_cadastral = '02'
+- Para todo o Brasil, NÃO use filtro de UF
+
+CÓDIGOS IMPORTANTES:
+- situacao_cadastral: '01'=Nula, '02'=Ativa, '03'=Suspensa, '04'=Inapta, '08'=Baixada
+- UFs válidas: SP, RJ, MG, RS, PR, SC, BA, etc (NUNCA use 'BR')
 
 EXEMPLOS:
 Pergunta: "Quantos estabelecimentos temos em SP?"
 SQL: SELECT COUNT(*) FROM estabelecimentos WHERE uf = 'SP';
+
+Pergunta: "Quantos estabelecimentos ativos no Brasil?"
+SQL: SELECT COUNT(*) FROM estabelecimentos WHERE situacao_cadastral = '02';
+
+Pergunta: "Quantos ativos em SP?"
+SQL: SELECT COUNT(*) FROM estabelecimentos WHERE uf = 'SP' AND situacao_cadastral = '02';
 
 Pergunta: "Mostre empresas de SP"  
 SQL: SELECT * FROM estabelecimentos WHERE uf = 'SP' LIMIT {top_k};
@@ -126,8 +143,10 @@ Consulta SQL PostgreSQL (apenas o SQL, sem explicações):"""
         )
         
         # Gerar SQL
+        print("[LLM] 🤖 Gemma está gerando SQL... (usando GPU)", flush=True)
         generate_query_chain = create_sql_query_chain(llm, db, prompt=prompt)
         sql_query = generate_query_chain.invoke({"question": pergunta})
+        print("[LLM] ✅ SQL gerado!", flush=True)
         
         # Limpar markdown formatting (```sql ... ```)
         sql_query = sql_query.strip()
@@ -139,17 +158,19 @@ Consulta SQL PostgreSQL (apenas o SQL, sem explicações):"""
             sql_query = sql_query[:-3]
         sql_query = sql_query.strip()
         
-        print(f"[SQL] Gerado: {sql_query[:200]}...")
+        print(f"[SQL] 📝 SQL: {sql_query[:200]}...", flush=True)
         
         # Executar SQL
+        print("[DB] 🔍 Executando query no PostgreSQL...", flush=True)
         with db._engine.connect() as connection:
             df = pd.read_sql_query(sql_text(sql_query), connection)
         
         num_resultados = len(df)
-        print(f"[RESULTADO] {num_resultados} registros")
+        print(f"[DB] ✅ Query executada! {num_resultados} registros retornados", flush=True)
         
         # Gerar resposta em linguagem natural
         if num_resultados > 0:
+            print("[LLM] 💬 Gemma está formulando resposta... (usando GPU)", flush=True)
             preview_data = df.head(5).to_string()
             
             answer_prompt = PromptTemplate.from_template(
@@ -169,8 +190,10 @@ Resposta em português:"""
                 "query": sql_query,
                 "result": preview_data
             })
+            print("[LLM] ✅ Resposta gerada!", flush=True)
         else:
             resposta_texto = "A consulta não retornou resultados."
+            print("[LLM] ⚠️ Nenhum resultado encontrado", flush=True)
         
         # Converter DataFrame para JSON
         dados_json = df.to_dict(orient='records')
@@ -266,11 +289,15 @@ def export_data():
         return jsonify({"sucesso": False, "erro": str(e)}), 500
 
 if __name__ == '__main__':
-    print("="*60)
-    print("🤖 LLM Service iniciando (LangChain + Gemma)...")
-    print(f"📊 Database: {DB_CONFIG['database']}")
-    print(f"🔗 Ollama: {OLLAMA_HOST}")
-    print("="*60)
+    import sys
+    sys.stdout.flush()
+    
+    print("="*60, flush=True)
+    print("🤖 LLM Service iniciando (LangChain + Gemma)...", flush=True)
+    print(f"📊 Database: {DB_CONFIG['database']}", flush=True)
+    print(f"🔗 Ollama: {OLLAMA_HOST}", flush=True)
+    print(f"🎮 GPU: Detectando uso via Ollama...", flush=True)
+    print("="*60, flush=True)
     
     app.run(host='0.0.0.0', port=8000, debug=False)
 
