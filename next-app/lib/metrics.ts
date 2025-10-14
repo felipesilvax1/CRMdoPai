@@ -81,7 +81,7 @@ export const dbQueryDurationHistogram = getOrCreateHistogram({
  * Contador de Erros
  * Incrementa cada vez que ocorre um erro na aplicação
  */
-export const errorsCounter = new Counter({
+export const errorsCounter = getOrCreateCounter({
   name: 'crm_errors_total',
   help: 'Total de erros na aplicação',
   labelNames: ['error_type', 'page'],
@@ -92,7 +92,7 @@ export const errorsCounter = new Counter({
  * Gauge de Usuários Ativos
  * Rastreia o número de usuários ativos no momento
  */
-export const activeUsersGauge = new Gauge({
+export const activeUsersGauge = getOrCreateGauge({
   name: 'crm_active_users',
   help: 'Número de usuários ativos no sistema',
   registers: [metricsRegistry],
@@ -102,7 +102,7 @@ export const activeUsersGauge = new Gauge({
  * Contador de Requisições HTTP
  * Incrementa para cada requisição HTTP recebida
  */
-export const httpRequestsCounter = new Counter({
+export const httpRequestsCounter = getOrCreateCounter({
   name: 'crm_http_requests_total',
   help: 'Total de requisições HTTP',
   labelNames: ['method', 'path', 'status'],
@@ -113,7 +113,7 @@ export const httpRequestsCounter = new Counter({
  * Histograma de Duração de Requisições HTTP
  * Mede o tempo de resposta das requisições HTTP
  */
-export const httpRequestDurationHistogram = new Histogram({
+export const httpRequestDurationHistogram = getOrCreateHistogram({
   name: 'crm_http_request_duration_seconds',
   help: 'Duração das requisições HTTP em segundos',
   labelNames: ['method', 'path', 'status'],
@@ -125,7 +125,7 @@ export const httpRequestDurationHistogram = new Histogram({
  * Contador de Relatórios Gerados
  * Incrementa cada vez que um relatório é gerado
  */
-export const reportsCounter = new Counter({
+export const reportsCounter = getOrCreateCounter({
   name: 'crm_reports_generated_total',
   help: 'Total de relatórios gerados',
   labelNames: ['format', 'status'],
@@ -136,7 +136,7 @@ export const reportsCounter = new Counter({
  * Gauge de Tamanho do Cache
  * Rastreia o número de items em cache
  */
-export const cacheSizeGauge = new Gauge({
+export const cacheSizeGauge = getOrCreateGauge({
   name: 'crm_cache_size_items',
   help: 'Número de items no cache',
   labelNames: ['cache_type'],
