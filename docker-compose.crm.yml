@@ -24,7 +24,7 @@ services:
     environment:
       - DB_HOST=cnpj_postgres_final
       - DB_PORT=5432
-      - DB_NAME=cnpj_processed
+      - DB_NAME=cnpj_processed_old
       - DB_USER=postgres
       - DB_PASSWORD=password
       - USE_POSTGRES=true
