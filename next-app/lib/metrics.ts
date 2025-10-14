@@ -13,6 +13,31 @@ import { register, Counter, Histogram, Gauge } from 'prom-client';
 // Registry padrão (contém métricas default do Node.js)
 export const metricsRegistry = register;
 
+// Helper para obter ou criar métrica (evita duplicação)
+function getOrCreateCounter(config: any) {
+  try {
+    return metricsRegistry.getSingleMetric(config.name) as Counter || new Counter(config);
+  } catch {
+    return new Counter(config);
+  }
+}
+
+function getOrCreateHistogram(config: any) {
+  try {
+    return metricsRegistry.getSingleMetric(config.name) as Histogram || new Histogram(config);
+  } catch {
+    return new Histogram(config);
+  }
+}
+
+function getOrCreateGauge(config: any) {
+  try {
+    return metricsRegistry.getSingleMetric(config.name) as Gauge || new Gauge(config);
+  } catch {
+    return new Gauge(config);
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Métricas Personalizadas
 // ═══════════════════════════════════════════════════════════════
@@ -21,7 +46,7 @@ export const metricsRegistry = register;
  * Contador de Buscas/Pesquisas
  * Incrementa cada vez que uma busca é realizada
  */
-export const searchesCounter = new Counter({
+export const searchesCounter = getOrCreateCounter({
   name: 'crm_searches_total',
   help: 'Total de buscas realizadas no sistema',
   labelNames: ['search_type', 'status'],
@@ -32,7 +57,7 @@ export const searchesCounter = new Counter({
  * Histograma de Duração de Consultas LLM
  * Mede o tempo de resposta das consultas ao LLM
  */
-export const llmDurationHistogram = new Histogram({
+export const llmDurationHistogram = getOrCreateHistogram({
   name: 'crm_llm_query_duration_seconds',
   help: 'Duração das consultas ao LLM em segundos',
   labelNames: ['model', 'status'],
@@ -44,7 +69,7 @@ export const llmDurationHistogram = new Histogram({
  * Histograma de Duração de Consultas ao Banco de Dados
  * Mede o tempo de resposta das consultas ao PostgreSQL
  */
-export const dbQueryDurationHistogram = new Histogram({
+export const dbQueryDurationHistogram = getOrCreateHistogram({
   name: 'crm_db_query_duration_seconds',
   help: 'Duração das consultas ao banco de dados em segundos',
   labelNames: ['query_type', 'status'],
