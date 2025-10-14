@@ -66,8 +66,8 @@ if (-not $SkipDump) {
         Write-Host "  Aviso: pg_dump nao encontrado no PATH!" -ForegroundColor Red
         Write-Host "  Tentando usar Docker..." -ForegroundColor Yellow
         
-        # Usar pg_dump do container
-        $dumpCmd = "docker run --rm --network host -v ${PWD}:/backup postgres:17 pg_dump -h 192.168.15.22 -U postgres -Fc cnpj_processado -f /backup/cnpj_processado.dump"
+        # Usar pg_dump do container COM SENHA
+        $dumpCmd = "docker run --rm --network host -e PGPASSWORD=postgres -v ${PWD}:/backup postgres:17 pg_dump -h 192.168.15.22 -U postgres -Fc cnpj_processado -f /backup/cnpj_processado.dump"
     } else {
         $dumpCmd = "pg_dump -h 192.168.15.22 -U postgres -Fc cnpj_processado -f cnpj_processado.dump"
     }
