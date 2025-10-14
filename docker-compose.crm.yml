@@ -22,14 +22,12 @@ services:
     ports:
       - "5000:5000"
     environment:
-      - DB_HOST=cnpj_postgres_final
+      - DB_HOST=host.docker.internal
       - DB_PORT=5432
-      - DB_NAME=cnpj_processed_old
+      - DB_NAME=cnpj_processado
       - DB_USER=postgres
       - DB_PASSWORD=password
       - USE_POSTGRES=true
-    external_links:
-      - cnpj_postgres_final
     networks:
       - crm-network
     restart: unless-stopped

@@ -88,27 +88,57 @@ def get_ufs():
 
 @app.route('/filtros/municipios', methods=['GET'])
 def get_municipios():
-    """Retorna lista de municípios (códigos IBGE)"""
+    """Retorna lista de municípios (códigos IBGE) - OTIMIZADO COM NOMES"""
     try:
+        import time
+        start = time.time()
+        
         uf = request.args.get('uf', '')
+        limit = min(int(request.args.get('limit', 50)), 200)  # Máximo 200, padrão 50
         
         if uf:
-            # Municípios de uma UF específica (sem JOIN - tabela municipios vazia)
-            sql = f"""
-                SELECT DISTINCT 
+            # TENTATIVA 1: Com JOIN na tabela municipios (se existir)
+            sql_com_join = f"""
+                SELECT 
+                    e.municipio as codigo,
+                    COALESCE(m.descricao, e.municipio) as descricao,
+                    COUNT(*) as total
+                FROM estabelecimentos e
+                LEFT JOIN municipios m ON e.municipio = m.codigo
+                WHERE e.uf = '{uf}' 
+                  AND e.municipio IS NOT NULL 
+                  AND e.municipio != ''
+                GROUP BY e.municipio, m.descricao
+                ORDER BY total DESC
+                LIMIT {limit}
+            """
+            
+            # FALLBACK: Sem JOIN (caso tabela municipios não exista)
+            sql_sem_join = f"""
+                SELECT 
                     municipio as codigo,
                     municipio as descricao,
                     COUNT(*) as total
                 FROM estabelecimentos 
-                WHERE uf = '{uf}' AND municipio IS NOT NULL AND municipio != ''
+                WHERE uf = '{uf}' 
+                  AND municipio IS NOT NULL 
+                  AND municipio != ''
                 GROUP BY municipio
                 ORDER BY total DESC
-                LIMIT 100
+                LIMIT {limit}
             """
+            
+            try:
+                result = executar_sql(sql_com_join)
+                print(f"[INFO] Usando query COM JOIN (tabela municipios encontrada)")
+            except Exception as join_error:
+                print(f"[WARN] JOIN falhou: {join_error}")
+                result = executar_sql(sql_sem_join)
+                print(f"[WARN] Usando query SEM JOIN (fallback)")
         else:
-            # Top municípios do Brasil (sem UF)
-            sql = """
-                SELECT DISTINCT 
+            # Top municípios do Brasil
+            sql = f"""
+                SELECT 
                     municipio as codigo,
                     municipio as descricao,
                     COUNT(*) as total
@@ -116,31 +146,104 @@ def get_municipios():
                 WHERE municipio IS NOT NULL AND municipio != ''
                 GROUP BY municipio
                 ORDER BY total DESC
-                LIMIT 100
+                LIMIT {limit}
             """
+            result = executar_sql(sql)
         
-        result = executar_sql(sql)
+        elapsed = time.time() - start
+        
+        print(f"[PERFORMANCE] /filtros/municipios (UF={uf}): {elapsed:.2f}s - {len(result)} resultados")
+        
         return jsonify({
             "municipios": result,
-            "nota": "Códigos IBGE - Tabela de nomes em migração"
+            "total": len(result),
+            "tempo_ms": int(elapsed * 1000)
         })
     except Exception as e:
+        print(f"[ERRO] /filtros/municipios: {str(e)}")
+        return jsonify({"erro": str(e)}), 500
+
+@app.route('/filtros/bairros', methods=['GET'])
+def get_bairros():
+    """Retorna lista de bairros de um município - OTIMIZADO"""
+    try:
+        import time
+        start = time.time()
+        
+        uf = request.args.get('uf', '')
+        municipio = request.args.get('municipio', '')
+        limit = min(int(request.args.get('limit', 100)), 500)
+        
+        if not municipio:
+            return jsonify({"erro": "Parâmetro 'municipio' é obrigatório"}), 400
+        
+        conditions = [f"municipio = '{municipio}'"]
+        if uf:
+            conditions.append(f"uf = '{uf}'")
+        
+        where_clause = " AND ".join(conditions)
+        
+        # OTIMIZADO: Usa índice e filtra bairros inválidos
+        sql = f"""
+            SELECT 
+                bairro,
+                COUNT(*) as total
+            FROM estabelecimentos 
+            WHERE {where_clause}
+              AND bairro IS NOT NULL 
+              AND bairro != ''
+              AND bairro NOT IN ('NAO INFORMADO', 'NAO DISPONIVEL', '-')
+            GROUP BY bairro
+            ORDER BY total DESC
+            LIMIT {limit}
+        """
+        
+        result = executar_sql(sql)
+        elapsed = time.time() - start
+        
+        print(f"[PERFORMANCE] /filtros/bairros (UF={uf}, MUN={municipio}): {elapsed:.2f}s - {len(result)} resultados")
+        
+        return jsonify({
+            "bairros": result,
+            "total": len(result),
+            "tempo_ms": int(elapsed * 1000)
+        })
+    except Exception as e:
+        print(f"[ERRO] /filtros/bairros: {str(e)}")
         return jsonify({"erro": str(e)}), 500
 
 @app.route('/filtros/cnaes', methods=['GET'])
 def get_cnaes():
     """Retorna CNAEs mais comuns"""
     try:
-        sql = """
+        limit = request.args.get('limit', 100)
+        sql = f"""
             SELECT cnae_fiscal_principal as codigo, COUNT(*) as total 
             FROM estabelecimentos 
             WHERE cnae_fiscal_principal IS NOT NULL 
             GROUP BY cnae_fiscal_principal 
             ORDER BY total DESC 
-            LIMIT 100
+            LIMIT {limit}
         """
         result = executar_sql(sql)
         return jsonify({"cnaes": result})
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+@app.route('/filtros/naturezas', methods=['GET'])
+def get_naturezas():
+    """Retorna naturezas jurídicas mais comuns"""
+    try:
+        sql = """
+            SELECT natureza_juridica as codigo, COUNT(*) as total 
+            FROM empresas 
+            WHERE natureza_juridica IS NOT NULL 
+            GROUP BY natureza_juridica 
+            ORDER BY total DESC 
+            LIMIT 50
+        """
+        result = executar_sql(sql)
+        return jsonify({"naturezas": result})
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
@@ -212,6 +315,157 @@ def query_filtrado():
         print(f"[ERRO] {str(e)}")
         return jsonify({"erro": str(e)}), 500
 
+@app.route('/query/avancada', methods=['GET'])
+def query_avancada():
+    """Executa query com FILTROS ABRANGENTES - Todos os parâmetros via query string"""
+    try:
+        # ========== LOCALIZAÇÃO ==========
+        uf = request.args.get('uf')
+        municipio = request.args.get('municipio')
+        bairro = request.args.get('bairro')
+        cep = request.args.get('cep')
+        
+        # ========== IDENTIFICAÇÃO ==========
+        razao_social = request.args.get('razaoSocial')
+        nome_fantasia = request.args.get('nomeFantasia')
+        cnpj = request.args.get('cnpj')
+        situacao = request.args.get('situacao')
+        matriz_filial = request.args.get('matrizFilial')
+        mei = request.args.get('mei')
+        
+        # ========== ECONÔMICO ==========
+        cnae = request.args.get('cnae')
+        natureza_juridica = request.args.get('naturezaJuridica')
+        porte_empresa = request.args.get('porteEmpresa')
+        capital_social_min = request.args.get('capitalSocialMin')
+        capital_social_max = request.args.get('capitalSocialMax')
+        opcao_simples = request.args.get('opcaoSimples')
+        
+        # ========== TEMPORAL ==========
+        data_abertura_inicio = request.args.get('dataAberturaInicio')
+        data_abertura_fim = request.args.get('dataAberturaFim')
+        
+        # ========== OUTROS ==========
+        ddd = request.args.get('ddd')
+        
+        # ========== PAGINAÇÃO ==========
+        limit = min(int(request.args.get('limit', 100)), 5000)
+        offset = int(request.args.get('offset', 0))
+        
+        # ========== CONSTRUIR WHERE ==========
+        conditions_estabelecimentos = []
+        conditions_empresas = []
+        
+        # Filtros de estabelecimentos
+        if uf:
+            conditions_estabelecimentos.append(f"e.uf = '{uf}'")
+        if municipio:
+            conditions_estabelecimentos.append(f"e.municipio = '{municipio}'")
+        if bairro:
+            conditions_estabelecimentos.append(f"e.bairro ILIKE '%{bairro}%'")
+        if cep:
+            conditions_estabelecimentos.append(f"e.cep = '{cep}'")
+        if nome_fantasia:
+            conditions_estabelecimentos.append(f"e.nome_fantasia ILIKE '%{nome_fantasia}%'")
+        if cnpj:
+            conditions_estabelecimentos.append(f"CONCAT(e.cnpj_basico, e.cnpj_ordem, e.cnpj_dv) = '{cnpj}'")
+        if situacao:
+            conditions_estabelecimentos.append(f"e.situacao_cadastral = '{situacao}'")
+        if matriz_filial:
+            conditions_estabelecimentos.append(f"e.identificador_matriz_filial = '{matriz_filial}'")
+        if cnae:
+            conditions_estabelecimentos.append(f"e.cnae_fiscal_principal LIKE '{cnae}%'")
+        if mei:
+            conditions_estabelecimentos.append(f"e.opcao_pelo_mei = '{mei}'")
+        if ddd:
+            conditions_estabelecimentos.append(f"e.ddd_1 = '{ddd}'")
+        if data_abertura_inicio:
+            conditions_estabelecimentos.append(f"e.data_inicio_atividade >= '{data_abertura_inicio}'")
+        if data_abertura_fim:
+            conditions_estabelecimentos.append(f"e.data_inicio_atividade <= '{data_abertura_fim}'")
+        if opcao_simples:
+            conditions_estabelecimentos.append(f"e.opcao_pelo_simples = '{opcao_simples}'")
+        
+        # Filtros de empresas
+        if razao_social:
+            conditions_empresas.append(f"emp.razao_social ILIKE '%{razao_social}%'")
+        if natureza_juridica:
+            conditions_empresas.append(f"emp.natureza_juridica = '{natureza_juridica}'")
+        if porte_empresa:
+            conditions_empresas.append(f"emp.porte_empresa = '{porte_empresa}'")
+        if capital_social_min:
+            conditions_empresas.append(f"emp.capital_social >= {capital_social_min}")
+        if capital_social_max:
+            conditions_empresas.append(f"emp.capital_social <= {capital_social_max}")
+        
+        # WHERE final
+        where_estabelecimentos = " AND ".join(conditions_estabelecimentos) if conditions_estabelecimentos else "1=1"
+        where_empresas = " AND ".join(conditions_empresas) if conditions_empresas else "1=1"
+        
+        # ========== QUERY PRINCIPAL ==========
+        sql = f"""
+            SELECT 
+                e.cnpj_basico,
+                e.cnpj_ordem,
+                e.cnpj_dv,
+                CONCAT(e.cnpj_basico, e.cnpj_ordem, e.cnpj_dv) as cnpj_completo,
+                e.nome_fantasia,
+                emp.razao_social,
+                e.situacao_cadastral,
+                e.identificador_matriz_filial,
+                e.uf,
+                e.municipio,
+                e.bairro,
+                e.logradouro,
+                e.numero,
+                e.cep,
+                e.cnae_fiscal_principal,
+                e.ddd_1,
+                e.telefone_1,
+                e.correio_eletronico,
+                e.data_inicio_atividade,
+                emp.natureza_juridica,
+                emp.porte_empresa,
+                emp.capital_social,
+                e.opcao_pelo_simples,
+                e.opcao_pelo_mei
+            FROM estabelecimentos e
+            LEFT JOIN empresas emp ON e.cnpj_basico = emp.cnpj_basico
+            WHERE {where_estabelecimentos}
+            {"AND " + where_empresas if conditions_empresas else ""}
+            ORDER BY e.cnpj_basico, e.cnpj_ordem
+            LIMIT {limit}
+            OFFSET {offset}
+        """
+        
+        # ========== COUNT TOTAL ==========
+        count_sql = f"""
+            SELECT COUNT(*) as total 
+            FROM estabelecimentos e
+            LEFT JOIN empresas emp ON e.cnpj_basico = emp.cnpj_basico
+            WHERE {where_estabelecimentos}
+            {"AND " + where_empresas if conditions_empresas else ""}
+        """
+        
+        print(f"[BUSCA AVANÇADA] Executando query com {len(conditions_estabelecimentos) + len(conditions_empresas)} filtros")
+        
+        resultados = executar_sql(sql)
+        total = executar_sql(count_sql)[0]['total']
+        
+        return jsonify({
+            "dados": resultados,
+            "total": total,
+            "retornados": len(resultados),
+            "filtros_ativos": len(conditions_estabelecimentos) + len(conditions_empresas),
+            "sql": sql[:500]  # Preview do SQL
+        })
+        
+    except Exception as e:
+        print(f"[ERRO BUSCA AVANÇADA] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"erro": str(e)}), 500
+
 @app.route('/health', methods=['GET'])
 def health_check():
     try:
@@ -227,6 +481,43 @@ def health_check():
             "status": "error",
             "error": str(e)
         }), 500
+
+@app.route('/debug/tabelas', methods=['GET'])
+def debug_tabelas():
+    """Debug: Verificar estrutura das tabelas"""
+    try:
+        # Ver tabelas disponíveis
+        tabelas = executar_sql("""
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public'
+            ORDER BY table_name
+        """)
+        
+        # Verificar tabela municipios
+        municipios_info = {
+            "tabela_existe": False,
+            "total_registros": 0,
+            "exemplo": []
+        }
+        
+        try:
+            count = executar_sql("SELECT COUNT(*) as total FROM municipios")
+            municipios_info["tabela_existe"] = True
+            municipios_info["total_registros"] = count[0]['total'] if count else 0
+            
+            if municipios_info["total_registros"] > 0:
+                exemplos = executar_sql("SELECT * FROM municipios LIMIT 3")
+                municipios_info["exemplo"] = exemplos
+        except:
+            pass
+        
+        return jsonify({
+            "tabelas": tabelas,
+            "municipios": municipios_info
+        })
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
 
 @app.route('/query', methods=['POST'])
 def handle_query():

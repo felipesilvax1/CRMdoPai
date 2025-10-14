@@ -9,23 +9,59 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 export default function BuscaAvancada() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [buscando, setBuscando] = useState(false);
   const router = useRouter();
 
-  // Opções de filtros
-  const [ufs, setUfs] = useState([]);
-  const [municipios, setMunicipios] = useState([]);
-  const [municipiosBusca, setMunicipiosBusca] = useState('');
+  // Estados dos filtros
+  const [filtros, setFiltros] = useState({
+    // Localização
+    uf: '',
+    municipio: '',
+    bairro: '',
+    cep: '',
+    
+    // Empresa
+    razaoSocial: '',
+    nomeFantasia: '',
+    cnpj: '',
+    situacao: '02', // Ativa por padrão
+    matrizFilial: '', // 1=Matriz, 2=Filial
+    
+    // Econômico
+    cnae: '',
+    naturezaJuridica: '',
+    porteEmpresa: '',
+    capitalSocialMin: '',
+    capitalSocialMax: '',
+    
+    // Temporal
+    dataAberturaInicio: '',
+    dataAberturaFim: '',
+    
+    // Outros
+    mei: '', // S/N
+    ddd: '',
+    opcaoSimples: '', // 1=Sim, 2=Não
+    
+    // Paginação
+    limit: 100,
+    offset: 0
+  });
 
-  // Filtros selecionados
-  const [ufSelecionada, setUfSelecionada] = useState('');
-  const [municipioSelecionado, setMunicipioSelecionado] = useState('');
-  const [situacaoSelecionada, setSituacaoSelecionada] = useState('02'); // Padrão: Ativas
-  const [limiteSelecionado, setLimiteSelecionado] = useState(50);
+  // Opções para dropdowns
+  const [opcoes, setOpcoes] = useState({
+    ufs: [],
+    municipios: [],
+    bairros: [],
+    cnaes: [],
+    naturezas: [],
+    portes: []
+  });
 
   // Resultados
   const [dados, setDados] = useState([]);
   const [totalEncontrado, setTotalEncontrado] = useState(0);
-  const [buscando, setBuscando] = useState(false);
+  const [filtrosAtivos, setFiltrosAtivos] = useState(0);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -45,113 +81,152 @@ export default function BuscaAvancada() {
         setUser(session.user);
       }
 
-      // Carregar UFs
-      carregarUFs();
+      await carregarOpcoes();
       setLoading(false);
     };
 
     checkSession();
   }, [router]);
 
-  const carregarUFs = async () => {
+  // Carregar opções para dropdowns
+  const carregarOpcoes = async () => {
     try {
-      console.log('Carregando UFs de:', `${API_URL}/filtros/ufs`);
-      const response = await fetch(`${API_URL}/filtros/ufs`);
-      const data = await response.json();
-      console.log('UFs recebidas:', data.ufs?.length || 0);
-      if (data.ufs && Array.isArray(data.ufs)) {
-        setUfs(data.ufs);
-        console.log('UFs setadas no estado:', data.ufs.length);
-      } else {
-        console.error('Formato inválido de UFs:', data);
+      // UFs
+      const ufsResponse = await fetch(`${API_URL}/filtros/ufs`);
+      const ufsData = await ufsResponse.json();
+      if (ufsData.ufs && ufsData.ufs.length > 0) {
+        setOpcoes(prev => ({ ...prev, ufs: ufsData.ufs }));
       }
+
+      // CNAEs principais
+      const cnaesResponse = await fetch(`${API_URL}/filtros/cnaes?limit=100`);
+      const cnaesData = await cnaesResponse.json();
+      if (cnaesData.cnaes) {
+        setOpcoes(prev => ({ ...prev, cnaes: cnaesData.cnaes }));
+      }
+
     } catch (error) {
-      console.error('Erro ao carregar UFs:', error);
-      // Fallback para teste - carregar UFs fixas
-      const ufsFixas = [
-        {uf: 'SP', total: 22873914}, {uf: 'MG', total: 8622911}, 
-        {uf: 'RJ', total: 6729190}, {uf: 'RS', total: 5470547},
-        {uf: 'PR', total: 5379569}, {uf: 'BA', total: 3948780},
-        {uf: 'SC', total: 3797700}, {uf: 'GO', total: 2832955},
-        {uf: 'PE', total: 2374609}, {uf: 'CE', total: 2244514}
-      ];
-      setUfs(ufsFixas);
-      console.log('Usando UFs fixas:', ufsFixas.length);
+      console.error('Erro ao carregar filtros:', error);
     }
   };
 
-  const carregarMunicipios = async (uf) => {
-    try {
-      const url = uf 
-        ? `${API_URL}/filtros/municipios?uf=${uf}`
-        : `${API_URL}/filtros/municipios`;
-      const response = await fetch(url);
-      const data = await response.json();
-      setMunicipios(data.municipios || []);
-    } catch (error) {
-      console.error('Erro ao carregar municípios:', error);
-    }
-  };
-
-  const buscarMunicipioPorNome = async (busca) => {
-    if (busca.length < 3) {
-      setMunicipios([]);
-      return;
-    }
-    try {
-      const response = await fetch(`${API_URL}/filtros/municipios?busca=${encodeURIComponent(busca)}`);
-      const data = await response.json();
-      setMunicipios(data.municipios || []);
-    } catch (error) {
-      console.error('Erro ao buscar municípios:', error);
-    }
-  };
-
-  const handleUfChange = (uf) => {
-    setUfSelecionada(uf);
-    setMunicipioSelecionado('');
-    if (uf) {
-      carregarMunicipios(uf);
+  // Carregar municípios quando UF mudar
+  useEffect(() => {
+    if (filtros.uf) {
+      const startTime = performance.now();
+      
+      fetch(`${API_URL}/filtros/municipios?uf=${filtros.uf}&limit=50`)
+        .then(res => res.json())
+        .then(data => {
+          const elapsed = performance.now() - startTime;
+          console.log(`⏱️ Municípios carregados em ${elapsed.toFixed(0)}ms (${data.municipios?.length || 0} resultados)`);
+          
+          if (data.municipios) {
+            setOpcoes(prev => ({ ...prev, municipios: data.municipios, bairros: [] }));
+          }
+          
+          if (data.tempo_ms) {
+            console.log(`📊 Tempo no servidor: ${data.tempo_ms}ms`);
+          }
+        })
+        .catch(console.error);
+      
+      // Limpar município e bairro quando UF mudar
+      setFiltros(prev => ({ ...prev, municipio: '', bairro: '' }));
     } else {
-      setMunicipios([]);
+      setOpcoes(prev => ({ ...prev, municipios: [], bairros: [] }));
+      setFiltros(prev => ({ ...prev, municipio: '', bairro: '' }));
     }
+  }, [filtros.uf]);
+
+  // Carregar bairros quando município mudar
+  useEffect(() => {
+    if (filtros.municipio && filtros.uf) {
+      fetch(`${API_URL}/filtros/bairros?uf=${filtros.uf}&municipio=${filtros.municipio}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.bairros) {
+            setOpcoes(prev => ({ ...prev, bairros: data.bairros }));
+          }
+        })
+        .catch(console.error);
+      
+      // Limpar bairro quando município mudar
+      setFiltros(prev => ({ ...prev, bairro: '' }));
+    } else {
+      setOpcoes(prev => ({ ...prev, bairros: [] }));
+      setFiltros(prev => ({ ...prev, bairro: '' }));
+    }
+  }, [filtros.municipio]);
+
+  // Atualizar filtro
+  const updateFiltro = (campo, valor) => {
+    setFiltros(prev => ({ ...prev, [campo]: valor }));
   };
 
+  // Contar filtros ativos
+  useEffect(() => {
+    const ativos = Object.entries(filtros).filter(([key, value]) => {
+      if (key === 'limit' || key === 'offset' || key === 'situacao') return false;
+      return value !== '' && value !== null && value !== undefined;
+    }).length;
+    setFiltrosAtivos(ativos);
+  }, [filtros]);
+
+  // Buscar
   const handleBuscar = async () => {
     setBuscando(true);
     setDados([]);
 
     try {
-      const response = await fetch(`${API_URL}/query/filtrado`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          uf: ufSelecionada || null,
-          municipio: municipioSelecionado || null,
-          situacao: situacaoSelecionada || null,
-          limit: limiteSelecionado
-        })
+      // Montar query params
+      const params = new URLSearchParams();
+      Object.entries(filtros).forEach(([key, value]) => {
+        if (value !== '' && value !== null && value !== undefined) {
+          params.append(key, value);
+        }
       });
 
+      const response = await fetch(`${API_URL}/query/avancada?${params.toString()}`);
       const data = await response.json();
       
       if (data.dados) {
         setDados(data.dados);
-        setTotalEncontrado(data.total_encontrado);
+        setTotalEncontrado(data.total || data.dados.length);
       }
     } catch (error) {
       console.error('Erro na busca:', error);
+      alert('Erro ao realizar busca. Verifique se a API está rodando.');
     } finally {
       setBuscando(false);
     }
   };
 
+  // Limpar filtros
   const limparFiltros = () => {
-    setUfSelecionada('');
-    setMunicipioSelecionado('');
-    setSituacaoSelecionada('02');
-    setLimiteSelecionado(50);
-    setMunicipios([]);
+    setFiltros({
+      uf: '',
+      municipio: '',
+      bairro: '',
+      cep: '',
+      razaoSocial: '',
+      nomeFantasia: '',
+      cnpj: '',
+      situacao: '02',
+      matrizFilial: '',
+      cnae: '',
+      naturezaJuridica: '',
+      porteEmpresa: '',
+      capitalSocialMin: '',
+      capitalSocialMax: '',
+      dataAberturaInicio: '',
+      dataAberturaFim: '',
+      mei: '',
+      ddd: '',
+      opcaoSimples: '',
+      limit: 100,
+      offset: 0
+    });
     setDados([]);
     setTotalEncontrado(0);
   };
@@ -164,127 +239,348 @@ export default function BuscaAvancada() {
     <main className="min-h-screen p-4 sm:p-8 bg-gray-900 text-white">
       <div className="w-full max-w-7xl mx-auto">
         {/* Header */}
-        <header className="flex justify-between items-center mb-8">
+        <header className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-3xl font-bold">🔍 Busca Avançada (Filtros)</h1>
-            <p className="text-gray-400">Busque sem usar IA - Rápido e gratuito!</p>
+            <h1 className="text-3xl font-bold">🔍 Busca Avançada</h1>
+            <p className="text-gray-400">Filtros abrangentes para buscas precisas</p>
           </div>
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="px-4 py-2 font-semibold text-white bg-gray-700 rounded-md hover:bg-gray-600"
-          >
-            ← Dashboard
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => router.push('/admin-console')}
+              className="px-4 py-2 font-semibold text-white bg-purple-600 rounded-md hover:bg-purple-700"
+            >
+              🎛️ Admin
+            </button>
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="px-4 py-2 font-semibold text-white bg-gray-700 rounded-md hover:bg-gray-600"
+            >
+              ← Dashboard
+            </button>
+          </div>
         </header>
 
-        {/* Informação */}
+        {/* Info Box */}
         <div className="mb-6 p-4 bg-blue-900 border border-blue-700 rounded-md">
           <p className="text-sm text-blue-200">
-            💡 <strong>Dica:</strong> Use os filtros abaixo para buscar diretamente no banco (79M registros). 
-            Queries simples são instantâneas e não gastam créditos de IA!
+            💡 <strong>Dica:</strong> Combine múltiplos filtros para buscas precisas. Deixe em branco os que não quiser usar.
+            {filtrosAtivos > 0 && <span className="ml-2 font-bold">{filtrosAtivos} filtros ativos</span>}
           </p>
         </div>
 
         {/* Filtros */}
         <div className="bg-gray-800 rounded-lg p-6 mb-6 border border-gray-700">
-          <h2 className="text-xl font-bold mb-4">📊 Filtros</h2>
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+            📊 Filtros Avançados
+            {filtrosAtivos > 0 && (
+              <span className="text-sm bg-blue-600 px-3 py-1 rounded-full">{filtrosAtivos}</span>
+            )}
+          </h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* UF */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Estado (UF) {ufs.length > 0 && <span className="text-xs text-green-400">({ufs.length} estados)</span>}
-              </label>
-              <select
-                value={ufSelecionada}
-                onChange={(e) => handleUfChange(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="">Todos os estados</option>
-                {ufs.length === 0 && <option disabled>Carregando estados...</option>}
-                {ufs.map((uf) => (
-                  <option key={uf.uf} value={uf.uf}>
-                    {uf.uf} ({uf.total.toLocaleString()} empresas)
-                  </option>
-                ))}
-              </select>
-              {ufs.length === 0 && (
-                <button
-                  onClick={carregarUFs}
-                  className="mt-2 text-xs text-indigo-400 hover:text-indigo-300 underline"
+          {/* Seção: Localização */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-3 text-blue-400">📍 Localização</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Estado (UF)</label>
+                <select
+                  value={filtros.uf}
+                  onChange={(e) => updateFiltro('uf', e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200"
                 >
-                  🔄 Recarregar estados
-                </button>
-              )}
-            </div>
+                  <option value="">Todos</option>
+                  {opcoes.ufs && opcoes.ufs.length > 0 ? (
+                    opcoes.ufs.map((uf) => (
+                      <option key={uf.uf} value={uf.uf}>
+                        {uf.uf} ({uf.total?.toLocaleString() || 0} empresas)
+                      </option>
+                    ))
+                  ) : (
+                    <option disabled>🔄 Carregando...</option>
+                  )}
+                </select>
+              </div>
 
-            {/* Município */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Município (Código IBGE) {ufSelecionada && <span className="text-xs text-gray-500">- {ufSelecionada}</span>}
-              </label>
-              <select
-                value={municipioSelecionado}
-                onChange={(e) => setMunicipioSelecionado(e.target.value)}
-                disabled={!ufSelecionada}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <option value="">
-                  {ufSelecionada ? 'Todos os municípios' : 'Selecione um estado primeiro'}
-                </option>
-                {municipios.map((m) => (
-                  <option key={m.codigo} value={m.codigo}>
-                    {m.codigo} - {m.total.toLocaleString()} empresas
-                  </option>
-                ))}
-              </select>
-              {ufSelecionada && municipios.length > 0 && (
-                <p className="text-xs text-gray-400 mt-1">
-                  📊 Top {municipios.length} municípios de {ufSelecionada} (ordenados por quantidade)
-                </p>
-              )}
-              {!ufSelecionada && (
-                <p className="text-xs text-gray-400 mt-1">
-                  ℹ️ Selecione um estado para ver os municípios
-                </p>
-              )}
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Município {opcoes.municipios.length > 0 && <span className="text-xs text-gray-500">({opcoes.municipios.length})</span>}
+                </label>
+                <select
+                  value={filtros.municipio}
+                  onChange={(e) => updateFiltro('municipio', e.target.value)}
+                  disabled={!filtros.uf}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 disabled:opacity-50"
+                >
+                  <option value="">Todos</option>
+                  {filtros.uf && opcoes.municipios.length === 0 && (
+                    <option disabled>🔄 Carregando...</option>
+                  )}
+                  {opcoes.municipios.map((m) => (
+                    <option key={m.codigo} value={m.codigo}>
+                      {m.codigo} ({m.total?.toLocaleString() || 0} empresas)
+                    </option>
+                  ))}
+                </select>
+                {!filtros.uf && (
+                  <p className="text-xs text-gray-500 mt-1">↑ Selecione um estado primeiro</p>
+                )}
+              </div>
 
-            {/* Situação */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Situação Cadastral
-              </label>
-              <select
-                value={situacaoSelecionada}
-                onChange={(e) => setSituacaoSelecionada(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="">Todas</option>
-                <option value="02">✅ Ativa (02)</option>
-                <option value="01">⚪ Nula (01)</option>
-                <option value="03">⏸️ Suspensa (03)</option>
-                <option value="04">❌ Inapta (04)</option>
-                <option value="08">🔻 Baixada (08)</option>
-              </select>
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Bairro {opcoes.bairros.length > 0 && <span className="text-xs text-gray-500">({opcoes.bairros.length})</span>}
+                </label>
+                <select
+                  value={filtros.bairro}
+                  onChange={(e) => updateFiltro('bairro', e.target.value)}
+                  disabled={!filtros.municipio}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 disabled:opacity-50"
+                >
+                  <option value="">Todos</option>
+                  {filtros.municipio && opcoes.bairros.length === 0 && (
+                    <option disabled>🔄 Carregando...</option>
+                  )}
+                  {opcoes.bairros.map((b, idx) => (
+                    <option key={idx} value={b.bairro}>
+                      {b.bairro} ({b.total?.toLocaleString() || 0} empresas)
+                    </option>
+                  ))}
+                </select>
+                {!filtros.municipio && (
+                  <p className="text-xs text-gray-500 mt-1">↑ Selecione um município primeiro</p>
+                )}
+              </div>
 
-            {/* Limite */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Resultados
-              </label>
-              <select
-                value={limiteSelecionado}
-                onChange={(e) => setLimiteSelecionado(parseInt(e.target.value))}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="10">10 resultados</option>
-                <option value="50">50 resultados</option>
-                <option value="100">100 resultados</option>
-                <option value="500">500 resultados</option>
-                <option value="1000">1000 resultados (máx)</option>
-              </select>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">CEP</label>
+                <input
+                  type="text"
+                  value={filtros.cep}
+                  onChange={(e) => updateFiltro('cep', e.target.value)}
+                  placeholder="00000000"
+                  maxLength="8"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Seção: Identificação */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-3 text-green-400">🏢 Identificação da Empresa</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Razão Social</label>
+                <input
+                  type="text"
+                  value={filtros.razaoSocial}
+                  onChange={(e) => updateFiltro('razaoSocial', e.target.value)}
+                  placeholder="Nome da empresa"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Nome Fantasia</label>
+                <input
+                  type="text"
+                  value={filtros.nomeFantasia}
+                  onChange={(e) => updateFiltro('nomeFantasia', e.target.value)}
+                  placeholder="Nome fantasia"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">CNPJ</label>
+                <input
+                  type="text"
+                  value={filtros.cnpj}
+                  onChange={(e) => updateFiltro('cnpj', e.target.value)}
+                  placeholder="00000000000000"
+                  maxLength="14"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Situação Cadastral</label>
+                <select
+                  value={filtros.situacao}
+                  onChange={(e) => updateFiltro('situacao', e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200"
+                >
+                  <option value="">Todas</option>
+                  <option value="02">✅ Ativa</option>
+                  <option value="01">⚪ Nula</option>
+                  <option value="03">⏸️ Suspensa</option>
+                  <option value="04">❌ Inapta</option>
+                  <option value="08">🔻 Baixada</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Matriz/Filial</label>
+                <select
+                  value={filtros.matrizFilial}
+                  onChange={(e) => updateFiltro('matrizFilial', e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200"
+                >
+                  <option value="">Ambos</option>
+                  <option value="1">🏢 Matriz</option>
+                  <option value="2">🏪 Filial</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">MEI</label>
+                <select
+                  value={filtros.mei}
+                  onChange={(e) => updateFiltro('mei', e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200"
+                >
+                  <option value="">Todos</option>
+                  <option value="S">Sim</option>
+                  <option value="N">Não</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Seção: Econômico */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-3 text-yellow-400">💼 Dados Econômicos</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">CNAE (Atividade)</label>
+                <input
+                  type="text"
+                  value={filtros.cnae}
+                  onChange={(e) => updateFiltro('cnae', e.target.value)}
+                  placeholder="Código CNAE (ex: 4711)"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Natureza Jurídica</label>
+                <input
+                  type="text"
+                  value={filtros.naturezaJuridica}
+                  onChange={(e) => updateFiltro('naturezaJuridica', e.target.value)}
+                  placeholder="Código"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Porte</label>
+                <select
+                  value={filtros.porteEmpresa}
+                  onChange={(e) => updateFiltro('porteEmpresa', e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200"
+                >
+                  <option value="">Todos</option>
+                  <option value="01">Micro Empresa</option>
+                  <option value="03">Pequeno Porte</option>
+                  <option value="05">Demais</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Capital Social Mínimo (R$)</label>
+                <input
+                  type="number"
+                  value={filtros.capitalSocialMin}
+                  onChange={(e) => updateFiltro('capitalSocialMin', e.target.value)}
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Capital Social Máximo (R$)</label>
+                <input
+                  type="number"
+                  value={filtros.capitalSocialMax}
+                  onChange={(e) => updateFiltro('capitalSocialMax', e.target.value)}
+                  placeholder="999999999.99"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Simples Nacional</label>
+                <select
+                  value={filtros.opcaoSimples}
+                  onChange={(e) => updateFiltro('opcaoSimples', e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200"
+                >
+                  <option value="">Todos</option>
+                  <option value="1">Sim</option>
+                  <option value="2">Não</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Seção: Temporal */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-3 text-purple-400">📅 Período</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Data Abertura (Início)</label>
+                <input
+                  type="date"
+                  value={filtros.dataAberturaInicio}
+                  onChange={(e) => updateFiltro('dataAberturaInicio', e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Data Abertura (Fim)</label>
+                <input
+                  type="date"
+                  value={filtros.dataAberturaFim}
+                  onChange={(e) => updateFiltro('dataAberturaFim', e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">DDD</label>
+                <input
+                  type="text"
+                  value={filtros.ddd}
+                  onChange={(e) => updateFiltro('ddd', e.target.value)}
+                  placeholder="11"
+                  maxLength="3"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Seção: Resultados */}
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-3 text-red-400">⚙️ Configurações de Busca</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Limite de Resultados</label>
+                <select
+                  value={filtros.limit}
+                  onChange={(e) => updateFiltro('limit', parseInt(e.target.value))}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200"
+                >
+                  <option value="10">10 resultados</option>
+                  <option value="50">50 resultados</option>
+                  <option value="100">100 resultados</option>
+                  <option value="500">500 resultados</option>
+                  <option value="1000">1000 resultados</option>
+                  <option value="5000">5000 resultados</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -293,21 +589,21 @@ export default function BuscaAvancada() {
             <button
               onClick={handleBuscar}
               disabled={buscando}
-              className="flex-1 px-6 py-3 font-bold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:bg-gray-500 disabled:cursor-not-allowed"
+              className="flex-1 px-6 py-3 font-bold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:bg-gray-500 disabled:cursor-not-allowed transition-colors"
             >
-              {buscando ? '🔍 Buscando...' : '🔍 Buscar'}
+              {buscando ? '🔍 Buscando...' : `🔍 Buscar${filtrosAtivos > 0 ? ` (${filtrosAtivos} filtros)` : ''}`}
             </button>
             <button
               onClick={limparFiltros}
-              className="px-6 py-3 font-semibold text-white bg-gray-700 rounded-md hover:bg-gray-600"
+              className="px-6 py-3 font-semibold text-white bg-gray-700 rounded-md hover:bg-gray-600 transition-colors"
             >
-              🔄 Limpar
+              🔄 Limpar Tudo
             </button>
             <button
               onClick={() => router.push('/chat-llm')}
-              className="px-6 py-3 font-semibold text-white bg-purple-600 rounded-md hover:bg-purple-700"
+              className="px-6 py-3 font-semibold text-white bg-purple-600 rounded-md hover:bg-purple-700 transition-colors"
             >
-              🤖 Usar IA (LLM)
+              🤖 Usar IA
             </button>
           </div>
         </div>
@@ -317,10 +613,10 @@ export default function BuscaAvancada() {
           <div className="mb-4 p-4 bg-green-900 border border-green-700 rounded-md">
             <p className="text-green-200">
               ✅ Encontrados <strong>{totalEncontrado.toLocaleString()}</strong> estabelecimentos. 
-              Mostrando os primeiros <strong>{dados.length}</strong>.
-              {totalEncontrado > dados.length && (
-                <span className="ml-2 text-sm">
-                  (Aumente o limite para ver mais)
+              Mostrando <strong>{dados.length}</strong> resultados.
+              {filtrosAtivos > 0 && (
+                <span className="ml-2">
+                  ({filtrosAtivos} filtros aplicados)
                 </span>
               )}
             </p>
@@ -335,7 +631,7 @@ export default function BuscaAvancada() {
           <div className="mt-6 p-4 bg-yellow-900 border border-yellow-700 rounded-md">
             <p className="text-sm text-yellow-200">
               💰 <strong>Economia:</strong> Esta busca foi executada diretamente no banco (grátis). 
-              O Chat LLM é útil para queries complexas, mas os filtros são mais rápidos e econômicos para buscas simples!
+              Use a IA (Chat LLM) apenas para queries complexas que exijam linguagem natural!
             </p>
           </div>
         )}
@@ -343,4 +639,3 @@ export default function BuscaAvancada() {
     </main>
   );
 }
-
