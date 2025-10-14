@@ -117,3 +117,4 @@ Write-Host "`nTempo total: $([math]::Round($tempo.TotalMinutes, 1)) minutos`n" -
 
 
 
+

@@ -1,0 +1,24 @@
+========================================
+RELATÓRIO - CRIAÇÃO DE ÍNDICES
+========================================
+Data: 14/10/2025 16:48:48
+
+ÍNDICES CRIADOS: 6/8
+TEMPO TOTAL: 10.4 min
+
+DETALHES:
+  • idx_estabelecimentos_uf: Filtro UF
+   • idx_estabelecimentos_municipio: Filtro Município
+   • idx_estabelecimentos_uf_municipio: Filtro UF + Município (cascata)
+   • idx_estabelecimentos_bairro: Filtro Bairro
+   • idx_estabelecimentos_cnae: Filtro CNAE
+   • idx_estabelecimentos_situacao: Filtro Situação
+   • idx_estabelecimentos_cep: Filtro CEP
+   • idx_estabelecimentos_ddd: Filtro DDD
+
+
+PRÓXIMOS PASSOS:
+1. Switch da API para Docker (porta 5433)
+2. Validar performance final
+3. Teste completo do sistema
+========================================

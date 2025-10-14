@@ -1,9 +1,10 @@
-// API Proxy - Redireciona /api/proxy/* para http://localhost:5000/*
+// API Proxy - Redireciona /api/proxy/* para http://192.168.15.22:5000/*
 export default async function handler(req, res) {
   const { path } = req.query;
   const apiPath = Array.isArray(path) ? path.join('/') : path;
   
-  const API_URL = 'http://localhost:5000';
+  // API rodando no container Docker
+  const API_URL = 'http://192.168.15.22:5000';
   const targetUrl = `${API_URL}/${apiPath}${req.url.includes('?') ? '?' + req.url.split('?')[1] : ''}`;
   
   console.log(`[PROXY] ${req.method} /api/proxy/${apiPath} → ${targetUrl}`);

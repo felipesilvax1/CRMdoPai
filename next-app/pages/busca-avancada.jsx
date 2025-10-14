@@ -6,12 +6,15 @@ import DataTable from '../components/DataTable';
 const DEV_MODE = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
-// Cache simples para evitar chamadas duplicadas
+// Cache otimizado para performance S&O
 const cache = {
   ufs: null,
   cnaes: null,
   municipios: {},
-  bairros: {}
+  bairros: {},
+  // Cache permanente para dados que não mudam
+  municipios_global: {},
+  bairros_global: {}
 };
 
 export default function BuscaAvancada() {
@@ -19,6 +22,48 @@ export default function BuscaAvancada() {
   const [loading, setLoading] = useState(true);
   const [buscando, setBuscando] = useState(false);
   const router = useRouter();
+
+  // Função para buscar municípios por LIKE
+  const buscarMunicipios = useCallback(async (uf, termo) => {
+    try {
+      const response = await fetch(`${API_URL}/filtros/municipios?uf=${uf}&busca=${encodeURIComponent(termo)}&limit=20`);
+      const data = await response.json();
+      
+      if (data.municipios) {
+        setOpcoes(prev => ({ ...prev, municipios: data.municipios }));
+        console.log(`🔍 Municípios encontrados para "${termo}": ${data.municipios.length}`);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar municípios:', error);
+    }
+  }, []);
+
+  // Função para buscar bairros por LIKE
+  const buscarBairros = useCallback(async (uf, municipio, termo) => {
+    try {
+      const url = `${API_URL}/filtros/bairros?uf=${uf}&municipio=${municipio}&busca=${encodeURIComponent(termo)}&limit=20`;
+      console.log(`🌐 Buscando bairros: ${url}`);
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      console.log(`📊 Resposta da API:`, data);
+      
+      if (data.bairros) {
+        setOpcoes(prev => ({ ...prev, bairros: data.bairros }));
+        console.log(`✅ Bairros encontrados para "${termo}": ${data.bairros.length}`);
+        if (data.tempo_ms) {
+          console.log(`⏱️ Tempo da API: ${data.tempo_ms}ms`);
+        }
+      } else {
+        console.log(`❌ Nenhum bairro encontrado para "${termo}"`);
+        setOpcoes(prev => ({ ...prev, bairros: [] }));
+      }
+    } catch (error) {
+      console.error('❌ Erro ao buscar bairros:', error);
+      setOpcoes(prev => ({ ...prev, bairros: [] }));
+    }
+  }, []);
 
   // Estados dos filtros
   const [filtros, setFiltros] = useState({
@@ -137,6 +182,10 @@ export default function BuscaAvancada() {
   
   useEffect(() => {
     if (filtros.uf) {
+      // Limpar bairros quando UF muda
+      setOpcoes(prev => ({ ...prev, bairros: [] }));
+      setFiltros(prev => ({ ...prev, bairro: '' }));
+      
       // Verificar cache primeiro
       const cacheKey = filtros.uf;
       if (cache.municipios[cacheKey]) {
@@ -188,12 +237,15 @@ export default function BuscaAvancada() {
   
   useEffect(() => {
     if (filtros.municipio && filtros.uf) {
-      // Verificar cache primeiro
+      // Limpar bairros quando município muda
+      setOpcoes(prev => ({ ...prev, bairros: [] }));
+      setFiltros(prev => ({ ...prev, bairro: '' }));
+      
+      // Verificar cache primeiro (só se for busca específica)
       const cacheKey = `${filtros.uf}-${filtros.municipio}`;
-      if (cache.bairros[cacheKey]) {
+      if (cache.bairros[cacheKey] && filtros.bairro && filtros.bairro.length >= 2) {
         console.log(`📦 Bairros de ${filtros.municipio} carregados do cache`);
         setOpcoes(prev => ({ ...prev, bairros: cache.bairros[cacheKey] }));
-        setFiltros(prev => ({ ...prev, bairro: '' }));
         return;
       }
 
@@ -206,21 +258,9 @@ export default function BuscaAvancada() {
       isLoadingBairros.current = true;
       const startTime = performance.now();
       
-      fetch(`${API_URL}/filtros/bairros?uf=${filtros.uf}&municipio=${filtros.municipio}`)
-        .then(res => res.json())
-        .then(data => {
-          const elapsed = performance.now() - startTime;
-          console.log(`⏱️ Bairros carregados em ${elapsed.toFixed(0)}ms (${data.bairros?.length || 0} resultados)`);
-          
-          if (data.bairros) {
-            cache.bairros[cacheKey] = data.bairros; // Salvar no cache
-            setOpcoes(prev => ({ ...prev, bairros: data.bairros }));
-          }
-        })
-        .catch(console.error)
-        .finally(() => {
-          isLoadingBairros.current = false;
-        });
+      // Não carregar bairros automaticamente - só quando houver busca
+      console.log(`📝 Município ${filtros.municipio} selecionado. Digite no campo bairro para buscar.`);
+      isLoadingBairros.current = false;
       
       // Limpar bairro quando município mudar
       setFiltros(prev => ({ ...prev, bairro: '' }));
@@ -362,8 +402,8 @@ export default function BuscaAvancada() {
                   <option value="">Todos</option>
                   {opcoes.ufs && opcoes.ufs.length > 0 ? (
                     opcoes.ufs.map((uf) => (
-                      <option key={uf.uf} value={uf.uf}>
-                        {uf.uf} ({uf.total?.toLocaleString() || 0} empresas)
+                      <option key={uf.codigo} value={uf.codigo}>
+                        {uf.descricao}
                       </option>
                     ))
                   ) : (
@@ -374,51 +414,112 @@ export default function BuscaAvancada() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Município {opcoes.municipios.length > 0 && <span className="text-xs text-gray-500">({opcoes.municipios.length})</span>}
+                  Município (Busca por digitação)
                 </label>
-                <select
+                <input
+                  type="text"
+                  placeholder="Digite o nome da cidade (ex: São Paulo)"
                   value={filtros.municipio}
-                  onChange={(e) => updateFiltro('municipio', e.target.value)}
+                  onChange={(e) => {
+                    const valor = e.target.value;
+                    updateFiltro('municipio', valor);
+                    // Buscar municípios conforme digita
+                    if (filtros.uf && valor.length >= 2) {
+                      buscarMunicipios(filtros.uf, valor);
+                    } else {
+                      setOpcoes(prev => ({ ...prev, municipios: [] }));
+                    }
+                  }}
                   disabled={!filtros.uf}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 disabled:opacity-50"
-                >
-                  <option value="">Todos</option>
-                  {filtros.uf && opcoes.municipios.length === 0 && (
-                    <option disabled>🔄 Carregando...</option>
-                  )}
-                  {opcoes.municipios.map((m) => (
-                    <option key={m.codigo} value={m.codigo}>
-                      {m.codigo} ({m.total?.toLocaleString() || 0} empresas)
-                    </option>
-                  ))}
-                </select>
+                />
+                {/* Dropdown de resultados */}
+                {filtros.uf && opcoes.municipios.length > 0 && (
+                  <div className="mt-1 max-h-40 overflow-y-auto bg-gray-800 border border-gray-600 rounded-md">
+                    {opcoes.municipios.map((m) => (
+                      <div
+                        key={m.codigo}
+                        onClick={() => {
+                          updateFiltro('municipio', m.descricao);
+                          setOpcoes(prev => ({ ...prev, municipios: [] }));
+                        }}
+                        className="px-3 py-2 hover:bg-gray-700 cursor-pointer text-gray-200 text-sm"
+                      >
+                        {m.descricao}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {!filtros.uf && (
                   <p className="text-xs text-gray-500 mt-1">↑ Selecione um estado primeiro</p>
+                )}
+                {filtros.uf && filtros.municipio.length > 0 && filtros.municipio.length < 2 && (
+                  <p className="text-xs text-gray-500 mt-1">Digite pelo menos 2 caracteres</p>
                 )}
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Bairro {opcoes.bairros.length > 0 && <span className="text-xs text-gray-500">({opcoes.bairros.length})</span>}
+                  Bairro (Busca por digitação)
                 </label>
-                <select
+                <input
+                  type="text"
+                  placeholder="Digite o nome do bairro (ex: Centro, Vila)"
                   value={filtros.bairro}
-                  onChange={(e) => updateFiltro('bairro', e.target.value)}
+                  onChange={(e) => {
+                    const valor = e.target.value;
+                    updateFiltro('bairro', valor);
+                    // Buscar bairros conforme digita - DEPENDENTE DO MUNICÍPIO SELECIONADO
+                    if (filtros.uf && filtros.municipio && valor.length >= 2) {
+                      // Extrair código do município - buscar em todos os municípios carregados
+                      let codigoMunicipio = filtros.municipio;
+                      
+                      // Se o campo municipio contém um nome, buscar o código correspondente
+                      if (opcoes.municipios && opcoes.municipios.length > 0) {
+                        const municipioSelecionado = opcoes.municipios.find(m => 
+                          m.descricao.toLowerCase() === filtros.municipio.toLowerCase() ||
+                          m.descricao.toLowerCase().includes(filtros.municipio.toLowerCase()) ||
+                          filtros.municipio.toLowerCase().includes(m.descricao.toLowerCase())
+                        );
+                        if (municipioSelecionado) {
+                          codigoMunicipio = municipioSelecionado.codigo;
+                          console.log(`🔍 Município encontrado: ${municipioSelecionado.descricao} (${codigoMunicipio})`);
+                        } else {
+                          console.log(`⚠️ Município não encontrado na lista carregada: ${filtros.municipio}`);
+                        }
+                      }
+                      
+                      console.log(`🔍 Buscando bairros em ${filtros.uf}/${codigoMunicipio} para "${valor}"`);
+                      buscarBairros(filtros.uf, codigoMunicipio, valor);
+                    } else {
+                      setOpcoes(prev => ({ ...prev, bairros: [] }));
+                    }
+                  }}
                   disabled={!filtros.municipio}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 disabled:opacity-50"
-                >
-                  <option value="">Todos</option>
-                  {filtros.municipio && opcoes.bairros.length === 0 && (
-                    <option disabled>🔄 Carregando...</option>
-                  )}
-                  {opcoes.bairros.map((b, idx) => (
-                    <option key={idx} value={b.bairro}>
-                      {b.bairro} ({b.total?.toLocaleString() || 0} empresas)
-                    </option>
-                  ))}
-                </select>
+                />
+                {/* Dropdown de resultados */}
+                {filtros.municipio && opcoes.bairros.length > 0 && (
+                  <div className="mt-1 max-h-40 overflow-y-auto bg-gray-800 border border-gray-600 rounded-md">
+                    {opcoes.bairros.map((b, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => {
+                          updateFiltro('bairro', b.descricao);
+                          setOpcoes(prev => ({ ...prev, bairros: [] }));
+                        }}
+                        className="px-3 py-2 hover:bg-gray-700 cursor-pointer text-gray-200 text-sm"
+                      >
+                        {b.descricao}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {!filtros.municipio && (
                   <p className="text-xs text-gray-500 mt-1">↑ Selecione um município primeiro</p>
+                )}
+                {filtros.municipio && filtros.bairro.length > 0 && filtros.bairro.length < 2 && (
+                  <p className="text-xs text-gray-500 mt-1">Digite pelo menos 2 caracteres</p>
                 )}
               </div>
 
