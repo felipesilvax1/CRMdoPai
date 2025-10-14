@@ -88,6 +88,9 @@ Write-Host "========================================" -ForegroundColor Cyan
 
 Write-Host "`nExecutando dump..." -ForegroundColor Yellow
 
+# Definir senha PostgreSQL
+$env:PGPASSWORD = "postgres"
+
 # Executar dump
 '@ + "`n" + $dumpCmd + @'
 
