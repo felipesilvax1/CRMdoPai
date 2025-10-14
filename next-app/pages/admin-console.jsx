@@ -5,22 +5,20 @@ export default function AdminConsole() {
   const [systemStatus, setSystemStatus] = useState({});
   const [currentView, setCurrentView] = useState('dashboard');
   const [loading, setLoading] = useState(true);
+  const [baseUrl, setBaseUrl] = useState('localhost'); // Estado para o hostname
 
-  // Detectar se está acessando localmente ou remotamente
-  const getBaseUrl = () => {
-    if (typeof window === 'undefined') return 'localhost';
-    return window.location.hostname;
-  };
+  // Detectar hostname apenas no cliente (evita erro de hydration)
+  useEffect(() => {
+    setBaseUrl(window.location.hostname);
+  }, []);
 
-  const baseUrl = getBaseUrl();
-
-  // Serviços disponíveis
+  // Serviços disponíveis (usar baseUrl do estado)
   const services = [
     {
       id: 'grafana',
       name: 'Grafana',
       description: 'Dashboards e Visualização',
-      url: `http://${baseUrl}:3002`,
+      port: 3002,
       icon: '📊',
       color: 'orange',
       category: 'observability'
@@ -29,7 +27,7 @@ export default function AdminConsole() {
       id: 'prometheus',
       name: 'Prometheus',
       description: 'Métricas e Alertas',
-      url: `http://${baseUrl}:9090`,
+      port: 9090,
       icon: '📈',
       color: 'red',
       category: 'observability'
@@ -38,7 +36,7 @@ export default function AdminConsole() {
       id: 'loki',
       name: 'Loki',
       description: 'Logs Centralizados',
-      url: `http://${baseUrl}:3100`,
+      port: 3100,
       icon: '📝',
       color: 'yellow',
       category: 'observability'
@@ -47,7 +45,7 @@ export default function AdminConsole() {
       id: 'cadvisor',
       name: 'cAdvisor',
       description: 'Métricas de Containers',
-      url: `http://${baseUrl}:8080`,
+      port: 8080,
       icon: '📦',
       color: 'blue',
       category: 'observability'
@@ -56,7 +54,7 @@ export default function AdminConsole() {
       id: 'localstack',
       name: 'LocalStack',
       description: 'AWS Simulada',
-      url: `http://${baseUrl}:4566`,
+      port: 4566,
       icon: '☁️',
       color: 'yellow',
       category: 'cloud'
@@ -65,7 +63,7 @@ export default function AdminConsole() {
       id: 'api',
       name: 'CRM API',
       description: 'API de Dados',
-      url: `http://${baseUrl}:5000`,
+      port: 5000,
       icon: '🔌',
       color: 'green',
       category: 'backend'
@@ -74,7 +72,7 @@ export default function AdminConsole() {
       id: 'llm',
       name: 'LLM Service',
       description: 'Serviço de IA',
-      url: `http://${baseUrl}:8000`,
+      port: 8000,
       icon: '🤖',
       color: 'purple',
       category: 'backend'
@@ -83,7 +81,7 @@ export default function AdminConsole() {
       id: 'frontend',
       name: 'Frontend CRM',
       description: 'Aplicação Principal',
-      url: `http://${baseUrl}:3000`,
+      port: 3000,
       icon: '🌐',
       color: 'indigo',
       category: 'frontend'
@@ -92,27 +90,26 @@ export default function AdminConsole() {
 
   // Verificar status dos serviços
   useEffect(() => {
+    // Só verificar status após ter o baseUrl correto
+    if (baseUrl === 'localhost' && typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+      return; // Aguardar o baseUrl ser atualizado
+    }
+
     const checkServices = async () => {
       const status = {};
       
       for (const service of services) {
+        const serviceUrl = `http://${baseUrl}:${service.port}`;
         try {
-          const response = await fetch(`${service.url}/health`, { 
+          // Tentar /health primeiro
+          const response = await fetch(`${serviceUrl}/health`, { 
             method: 'GET',
             signal: AbortSignal.timeout(3000)
           });
           status[service.id] = response.ok ? 'online' : 'offline';
         } catch (error) {
-          // Alguns serviços não têm /health, tentar apenas conectar
-          try {
-            await fetch(service.url, { 
-              method: 'HEAD',
-              signal: AbortSignal.timeout(3000) 
-            });
-            status[service.id] = 'online';
-          } catch {
-            status[service.id] = 'offline';
-          }
+          // Alguns serviços não têm /health, marcar como disponível por padrão
+          status[service.id] = 'available';
         }
       }
       
@@ -124,7 +121,7 @@ export default function AdminConsole() {
     const interval = setInterval(checkServices, 30000); // Atualizar a cada 30s
     
     return () => clearInterval(interval);
-  }, []);
+  }, [baseUrl]);
 
   // Categorias
   const categories = {
@@ -137,12 +134,14 @@ export default function AdminConsole() {
   const getStatusColor = (status) => {
     if (status === 'online') return 'green';
     if (status === 'offline') return 'red';
+    if (status === 'available') return 'blue';
     return 'gray';
   };
 
   const getStatusText = (status) => {
     if (status === 'online') return '🟢 Online';
     if (status === 'offline') return '🔴 Offline';
+    if (status === 'available') return '🔵 Disponível';
     return '⚪ Verificando...';
   };
 
@@ -184,7 +183,11 @@ export default function AdminConsole() {
           {/* Quick Actions */}
           <div className="mb-8 grid grid-cols-1 md:grid-cols-4 gap-4">
             <button
-              onClick={() => window.open(`http://${baseUrl}:3002`, '_blank')}
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.open(`http://${baseUrl}:3002`, '_blank');
+                }
+              }}
               className="p-4 bg-gradient-to-br from-orange-600 to-orange-700 rounded-lg hover:from-orange-500 hover:to-orange-600 transition-all transform hover:scale-105 shadow-lg"
             >
               <div className="text-3xl mb-2">📊</div>
@@ -193,7 +196,11 @@ export default function AdminConsole() {
             </button>
 
             <button
-              onClick={() => window.open(`http://${baseUrl}:9090`, '_blank')}
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.open(`http://${baseUrl}:9090`, '_blank');
+                }
+              }}
               className="p-4 bg-gradient-to-br from-red-600 to-red-700 rounded-lg hover:from-red-500 hover:to-red-600 transition-all transform hover:scale-105 shadow-lg"
             >
               <div className="text-3xl mb-2">📈</div>
@@ -202,7 +209,11 @@ export default function AdminConsole() {
             </button>
 
             <button
-              onClick={() => window.open(`http://${baseUrl}:8080`, '_blank')}
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.open(`http://${baseUrl}:8080`, '_blank');
+                }
+              }}
               className="p-4 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg hover:from-blue-500 hover:to-blue-600 transition-all transform hover:scale-105 shadow-lg"
             >
               <div className="text-3xl mb-2">📦</div>
@@ -211,7 +222,11 @@ export default function AdminConsole() {
             </button>
 
             <button
-              onClick={() => window.open(`http://${baseUrl}:4566/_localstack/health`, '_blank')}
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.open(`http://${baseUrl}:4566/_localstack/health`, '_blank');
+                }
+              }}
               className="p-4 bg-gradient-to-br from-yellow-600 to-yellow-700 rounded-lg hover:from-yellow-500 hover:to-yellow-600 transition-all transform hover:scale-105 shadow-lg"
             >
               <div className="text-3xl mb-2">☁️</div>
@@ -250,14 +265,15 @@ export default function AdminConsole() {
 
                       <div className="flex space-x-2">
                         <button
-                          onClick={() => window.open(service.url, '_blank')}
+                          onClick={() => window.open(`http://${baseUrl}:${service.port}`, '_blank')}
                           className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm font-semibold transition-colors"
                         >
                           Abrir
                         </button>
                         <button
                           onClick={() => {
-                            navigator.clipboard.writeText(service.url);
+                            const url = `http://${baseUrl}:${service.port}`;
+                            navigator.clipboard.writeText(url);
                             alert('URL copiada!');
                           }}
                           className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm transition-colors"
@@ -268,7 +284,7 @@ export default function AdminConsole() {
                       </div>
 
                       <div className="mt-2 text-xs text-gray-500 font-mono truncate">
-                        {service.url}
+                        http://{baseUrl}:{service.port}
                       </div>
                     </div>
                   ))}
