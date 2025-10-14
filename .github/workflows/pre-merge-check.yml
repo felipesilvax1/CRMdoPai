@@ -1,0 +1,48 @@
+name: 🔍 Pre-Merge Quality Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  quality-check:
+    name: 📋 Quality Gate
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📊 Check changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v40
+        with:
+          files: |
+            **/*.js
+            **/*.jsx
+            **/*.ts
+            **/*.tsx
+            **/*.py
+            **/*.yml
+            **/*.yaml
+
+      - name: 📦 Setup Node.js
+        if: steps.changed-files.outputs.any_changed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+          cache: 'npm'
+          cache-dependency-path: next-app/package-lock.json
+
+      - name: 🔍 Lint changed files
+        if: steps.changed-files.outputs.any_changed == 'true'
+        working-directory: ./next-app
+        run: |
+          npm ci
+          npm run lint
+
+      - name: ✅ All checks passed
+        run: echo "✅ Pre-merge checks passed successfully!"
+

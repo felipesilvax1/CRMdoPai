@@ -1,502 +1,359 @@
-# 🚀 Guia Completo - CI/CD e Testes Automatizados
+# 🚀 Guia CI/CD - Sistema CRM
 
-## 📋 Visão Geral
-
-Sistema completo de CI/CD com **testes automatizados** para garantir qualidade e confiabilidade em todos os componentes.
-
-```
-┌─────────────────────────────────────────────┐
-│           PIPELINE CI/CD                    │
-├─────────────────────────────────────────────┤
-│                                             │
-│  1. Push/PR → GitHub                        │
-│  2. Trigger → GitHub Actions                │
-│  3. Testes Paralelos:                       │
-│     • API de Dados     ✅                   │
-│     • LLM Service      ✅                   │
-│     • Frontend         ✅                   │
-│     • Qualidade Código ✅                   │
-│  4. Testes Integração  ✅                   │
-│  5. Build Docker       ✅                   │
-│  6. Deploy Produção    ✅                   │
-│                                             │
-└─────────────────────────────────────────────┘
-```
+Documentação completa da esteira de CI/CD para detectar erros automaticamente e garantir qualidade do código.
 
 ---
 
-## 🧪 Testes Implementados
+## 🎯 **Visão Geral**
 
-### 1. **API de Dados** (`api/tests/`)
+O sistema possui **3 níveis de validação**:
 
-**Framework:** Pytest
-
-**Cobertura:**
-- ✅ Endpoint `/health`
-- ✅ Endpoint `/query`
-- ✅ Gerador de SQL
-- ✅ Conexão com PostgreSQL
-- ✅ CORS headers
-- ✅ Tratamento de erros
-
-**Executar:**
-```bash
-cd api
-pytest tests/ -v --cov=. --cov-report=term-missing
-```
-
-**Testes:**
-- `test_api.py` - Testes unitários e de integração
-- `conftest.py` - Configuração do pytest
+1. **🔍 Pre-Commit** - Validação local antes de commitar
+2. **🔄 CI/CD Pipeline** - Validação automática no GitHub
+3. **🚦 Pre-Merge Check** - Validação antes de merge em PRs
 
 ---
 
-### 2. **LLM Service** (`llm-service/tests/`)
+## 📋 **Checklist de Testes**
 
-**Framework:** Pytest
+### ✅ **1. Code Linting**
+- ESLint no código Next.js/React
+- Validação de sintaxe Python
+- Formatação de código
 
-**Cobertura:**
-- ✅ Endpoint `/health`
-- ✅ Endpoint `/ask` (perguntas LLM)
-- ✅ Endpoint `/export` (CSV/PDF)
-- ✅ Conexão com Ollama (mockada)
-- ✅ Geração de SQL via LangChain
-- ✅ Tratamento de erros
+### ✅ **2. Build Validation**
+- Build do Next.js (produção)
+- Compilação sem erros
+- Assets gerados corretamente
 
-**Executar:**
-```bash
-cd llm-service
-pytest tests/ -v --cov=. --cov-report=term-missing
-```
+### ✅ **3. Unit Tests**
+- Testes Jest no frontend
+- Cobertura de código
+- Componentes React testados
 
-**Testes:**
-- `test_llm_api.py` - Testes com mocks do LangChain
-- `conftest.py` - Configuração e fixtures
+### ✅ **4. Config Validation**
+- Docker Compose válido
+- YAML configs corretos (Prometheus, Loki, Grafana)
+- JSON válido em todos os arquivos
 
----
+### ✅ **5. Python Validation**
+- Sintaxe Python correta
+- Imports válidos
+- Flake8 linting
 
-### 3. **Frontend Next.js** (`next-app/__tests__/`)
-
-**Framework:** Jest + React Testing Library
-
-**Cobertura:**
-- ✅ Página de login (modo dev)
-- ✅ Componente DataTable
-- ✅ API Client (fetch)
-- ✅ Navegação
-- ✅ LocalStorage
-
-**Executar:**
-```bash
-cd next-app
-npm test        # Modo watch
-npm run test:ci # CI mode com coverage
-```
-
-**Testes:**
-- `pages/index.test.jsx` - Página de login
-- `components/DataTable.test.jsx` - Tabela de dados
-- `lib/apiClient.test.js` - Cliente da API
-
-**Configuração:**
-- `jest.config.js` - Configuração do Jest
-- `jest.setup.js` - Mocks e setup global
+### ✅ **6. Security Scan**
+- npm audit (vulnerabilidades)
+- Scan de secrets hardcoded
+- Dependências seguras
 
 ---
 
-### 4. **Testes de Integração**
+## 🔧 **Uso Local**
 
-**Framework:** Docker Compose + Pytest
+### **Validação Completa (antes de push):**
 
-**Cobertura:**
-- ✅ Todos os containers rodando
-- ✅ Comunicação entre serviços
-- ✅ Endpoints funcionando
-- ✅ Banco de dados acessível
-
-**Executar:**
-```bash
-docker-compose -f docker-compose.test.yml up -d
-docker-compose -f docker-compose.test.yml logs
-docker-compose -f docker-compose.test.yml down
-```
-
----
-
-## 🔄 CI/CD Pipeline (GitHub Actions)
-
-### Arquivo: `.github/workflows/ci-cd.yml`
-
-### **Jobs do Pipeline:**
-
-#### 1. **test-api** ✅
-- Python 3.11
-- PostgreSQL 15 (service container)
-- Pytest com coverage
-- Upload para Codecov
-
-#### 2. **test-llm** ✅
-- Python 3.11
-- PostgreSQL 15
-- Mock do Ollama
-- Pytest com coverage
-
-#### 3. **test-frontend** ✅
-- Node.js 18
-- Jest + React Testing Library
-- Lint + Build
-- Coverage report
-
-#### 4. **test-integration** ✅
-- Docker Compose
-- Testes end-to-end
-- Validação de serviços
-
-#### 5. **build-and-push** ✅
-- Build imagens Docker
-- Push para Docker Hub
-- Tag automático
-- Cache otimizado
-
-#### 6. **deploy** ✅
-- Deploy para produção
-- Aprovação manual
-- Rollback automático
-
-#### 7. **code-quality** ✅
-- SonarCloud (análise de código)
-- Trivy (vulnerabilidades)
-- SARIF upload
-
----
-
-## 🛠️ Executar Testes Localmente
-
-### **Opção 1: Script Automatizado (Recomendado)**
-
-**Linux/Mac:**
-```bash
-chmod +x run-tests.sh
-./run-tests.sh
-```
-
-**Windows:**
 ```powershell
-.\run-tests.ps1
+# Executa todos os testes
+.\validate-all.ps1
 ```
 
-### **Opção 2: Manual**
+**O que faz:**
+- ✅ Valida todos os JSON
+- ✅ Executa ESLint
+- ✅ Faz build do Next.js
+- ✅ Roda testes unitários
+- ✅ Valida Docker Compose
+- ✅ Valida configs YAML
+- ✅ Verifica Python
+- ✅ Valida estrutura de arquivos
 
-**API de Dados:**
-```bash
-cd api
-pip install pytest pytest-cov pytest-mock
-pytest tests/ -v --cov=.
+**Se tudo passar:**
+- Oferece fazer commit + push automaticamente
+- Garante que pipeline no GitHub vai passar
+
+### **Validação Rápida (pre-commit):**
+
+```powershell
+# Validação rápida antes de commitar
+.\pre-commit.ps1
 ```
 
-**LLM Service:**
-```bash
-cd llm-service
-pip install pytest pytest-cov pytest-mock
-pytest tests/ -v --cov=.
+**O que faz:**
+- ✅ Valida JSON
+- ✅ ESLint rápido
+- Muito mais rápido que validação completa
+
+---
+
+## 🔄 **Pipeline GitHub Actions**
+
+### **Quando é executado:**
+- ✅ Push para `main`, `feat/*`, `dev`
+- ✅ Pull Requests para `main`
+- ✅ Manualmente (workflow_dispatch)
+
+### **Jobs executados:**
+
+```mermaid
+graph TD
+    A[Lint] --> B[Build Frontend]
+    A --> C[Test Frontend]
+    A --> D[Validate Python]
+    A --> E[Validate Docker]
+    A --> F[Validate Configs]
+    A --> G[Security Scan]
+    
+    B --> H[Deploy]
+    C --> H
+    D --> H
+    E --> H
+    F --> H
+    G --> H
 ```
 
-**Frontend:**
-```bash
-cd next-app
-npm install
-npm run test:ci
-```
+### **1. 🔍 Lint & Code Quality**
+- ESLint no Next.js
+- Validação de JSON
+- ~30 segundos
 
-**Integração (Docker):**
-```bash
-docker-compose -f docker-compose.test.yml up -d
-# Aguardar 30 segundos
-curl http://localhost:5001/health
-curl http://localhost:8001/health
-docker-compose -f docker-compose.test.yml down
+### **2. 🏗️ Build Next.js Frontend**
+- Build de produção
+- Upload de artifacts
+- ~2 minutos
+
+### **3. 🧪 Test Next.js Frontend**
+- Jest tests
+- Coverage report
+- Upload para Codecov
+- ~1 minuto
+
+### **4. 🐍 Validate Python Services**
+- Flake8 linting
+- Syntax check
+- ~30 segundos
+
+### **5. 🐳 Validate Docker**
+- docker-compose config
+- Dockerfile validation
+- ~30 segundos
+
+### **6. ⚙️ Validate Configs**
+- Prometheus YAML
+- Loki config
+- Grafana provisioning
+- ~30 segundos
+
+### **7. 🔒 Security Scan**
+- npm audit
+- Secret scanning
+- ~1 minuto
+
+### **8. 🚀 Deploy**
+- Só executa se **TUDO** passar
+- Cria deployment summary
+- Marca sucesso
+
+### **9. 🚨 Notify on Failure**
+- Executa se qualquer job falhar
+- Mostra relatório de erros
+
+---
+
+## 📊 **Visualizando Resultados**
+
+### **No GitHub:**
+
+1. Vá para: **Actions** tab no repositório
+2. Veja o workflow rodando em tempo real
+3. Clique em qualquer job para ver detalhes
+4. ✅ Verde = Passou | ❌ Vermelho = Falhou
+
+### **Status Badge (opcional):**
+
+Adicione no README.md:
+
+```markdown
+![CI/CD](https://github.com/SEU-USUARIO/CRM/actions/workflows/ci-cd.yml/badge.svg)
 ```
 
 ---
 
-## 📊 Coverage (Cobertura de Testes)
+## 🔧 **Configuração Inicial**
 
-### Meta: **>= 80% de cobertura**
+### **1. Ativar GitHub Actions:**
 
-**Ver relatórios:**
 ```bash
-# API
-cd api && pytest --cov=. --cov-report=html
-open htmlcov/index.html
+# Já está configurado! Apenas faça push:
+git add .github/workflows
+git commit -m "ci: add CI/CD pipeline"
+git push
+```
 
-# LLM
-cd llm-service && pytest --cov=. --cov-report=html
-open htmlcov/index.html
+### **2. Configurar Secrets (opcional):**
 
-# Frontend
-cd next-app && npm run test:ci
-open coverage/lcov-report/index.html
+Se precisar de secrets no CI/CD:
+
+1. GitHub → Settings → Secrets and variables → Actions
+2. New repository secret
+3. Adicione: `NPM_TOKEN`, `DOCKER_HUB_TOKEN`, etc.
+
+### **3. Branch Protection Rules (recomendado):**
+
+1. GitHub → Settings → Branches
+2. Add rule para `main`
+3. Ative:
+   - ✅ Require status checks to pass
+   - ✅ Require branches to be up to date
+   - ✅ Require CI/CD Pipeline to pass
+
+---
+
+## 🎨 **Customização**
+
+### **Adicionar novo teste:**
+
+Edite `.github/workflows/ci-cd.yml`:
+
+```yaml
+- name: 🧪 Meu novo teste
+  run: |
+    echo "Executando meu teste..."
+    npm run my-test
+```
+
+### **Ignorar arquivos:**
+
+Adicione no workflow:
+
+```yaml
+paths-ignore:
+  - '**.md'
+  - 'docs/**'
+```
+
+### **Executar apenas em branches específicas:**
+
+```yaml
+on:
+  push:
+    branches: [ main, production ]
 ```
 
 ---
 
-## 🔐 Configuração do GitHub Actions
+## 🐛 **Troubleshooting**
 
-### 1. **Secrets Necessários**
+### **Pipeline está falhando mas funciona localmente:**
 
-Vá em: **Settings > Secrets and variables > Actions**
+1. Verifique versões de Node/Python no workflow
+2. Rode `npm ci` em vez de `npm install` localmente
+3. Limpe cache: `npm ci --clean`
 
+### **Testes estão muito lentos:**
+
+1. Use `npm ci` em vez de `npm install`
+2. Ative cache do GitHub Actions (já ativado)
+3. Reduza número de testes ou use paralelização
+
+### **Docker validation falha:**
+
+```powershell
+# Teste localmente:
+docker-compose config
+
+# Se falhar, corrija o YAML
 ```
-DOCKER_USERNAME     # Usuário Docker Hub
-DOCKER_PASSWORD     # Senha/Token Docker Hub
-SONAR_TOKEN        # Token SonarCloud (opcional)
-CODECOV_TOKEN      # Token Codecov (opcional)
+
+### **Security scan encontra vulnerabilidades:**
+
+```powershell
+# Veja detalhes:
+npm audit
+
+# Corrija automaticamente (se possível):
+npm audit fix
+
+# Ou force (cuidado!):
+npm audit fix --force
 ```
-
-### 2. **Environments**
-
-Vá em: **Settings > Environments**
-
-Criar: `production`
-- ✅ Required reviewers (quem pode aprovar deploy)
-- ✅ Wait timer (tempo de espera)
-- ✅ Deployment protection rules
-
-### 3. **Branch Protection**
-
-Vá em: **Settings > Branches**
-
-Para branch `main`:
-- ✅ Require pull request reviews (1+ approvals)
-- ✅ Require status checks:
-  - `test-api`
-  - `test-llm`
-  - `test-frontend`
-  - `test-integration`
-- ✅ Require branches to be up to date
-- ✅ Require conversation resolution
 
 ---
 
-## 🚀 Workflow de Desenvolvimento
+## 📈 **Métricas e Monitoramento**
 
-### **1. Criar Feature Branch**
-```bash
-git checkout -b feature/minha-feature
-```
+### **Tempo médio de pipeline:**
+- ✅ Completo: ~5-7 minutos
+- ✅ Lint only: ~30 segundos
+- ✅ Build: ~2 minutos
 
-### **2. Desenvolver & Testar Localmente**
-```bash
-# Fazer alterações
-vim api/app.py
+### **Taxa de sucesso esperada:**
+- ✅ 95%+ após configuração inicial
+- ⚠️ Falhas geralmente são erros reais de código
 
-# Testar
-cd api
-pytest tests/ -v
+---
 
-# Commit
+## 🎯 **Boas Práticas**
+
+### ✅ **Sempre:**
+1. Rode `.\validate-all.ps1` antes de push
+2. Corrija warnings de lint
+3. Mantenha testes atualizados
+4. Verifique coverage de testes
+5. Atualize dependências regularmente
+
+### ❌ **Nunca:**
+1. Force push sem rodar testes
+2. Commite com erros de lint
+3. Ignore falhas de segurança
+4. Desabilite o pipeline sem motivo
+5. Commite segredos/senhas
+
+---
+
+## 🔗 **Links Úteis**
+
+- [GitHub Actions Docs](https://docs.github.com/en/actions)
+- [Jest Testing](https://jestjs.io/)
+- [ESLint](https://eslint.org/)
+- [Docker Compose](https://docs.docker.com/compose/)
+
+---
+
+## 📝 **Exemplo de Workflow**
+
+```powershell
+# 1. Fazer mudanças no código
+code next-app/pages/admin-console.jsx
+
+# 2. Validar localmente
+.\validate-all.ps1
+
+# 3. Se passar, commitar
 git add .
-git commit -m "feat: adicionar novo endpoint"
-```
+git commit -m "feat: improve admin console"
 
-### **3. Push & Abrir PR**
-```bash
-git push origin feature/minha-feature
-# Abrir PR no GitHub
-```
+# 4. Push (vai executar pipeline)
+git push
 
-### **4. Pipeline Automático**
-- ✅ Testes executam automaticamente
-- ✅ Status aparece no PR
-- ✅ Coverage atualizado
-- ✅ Code quality analisado
-
-### **5. Review & Merge**
-- ✅ Reviewers aprovam
-- ✅ Merge para `main`
-- ✅ Build & Deploy automático
-
----
-
-## 📈 Monitoramento
-
-### **GitHub Actions Dashboard**
-```
-https://github.com/SEU_USUARIO/SEU_REPO/actions
-```
-
-### **Codecov Dashboard** (opcional)
-```
-https://codecov.io/gh/SEU_USUARIO/SEU_REPO
-```
-
-### **SonarCloud Dashboard** (opcional)
-```
-https://sonarcloud.io/project/overview?id=SEU_PROJETO
+# 5. Verificar no GitHub Actions
+# ✅ Pipeline passa → Código está OK
+# ❌ Pipeline falha → Ver logs e corrigir
 ```
 
 ---
 
-## 🐛 Troubleshooting
+## 🎉 **Resultado**
 
-### **Teste Falhou Localmente**
+Com essa esteira de CI/CD você tem:
 
-```bash
-# Ver output detalhado
-pytest tests/ -vv -s
-
-# Executar teste específico
-pytest tests/test_api.py::TestHealthEndpoint::test_health_success -v
-
-# Debug mode
-pytest tests/ --pdb
-```
-
-### **Pipeline Falhou no GitHub**
-
-1. **Ver logs:** Click no job que falhou
-2. **Reproduzir localmente:** Usar os mesmos comandos do workflow
-3. **Verificar secrets:** Confirmar que estão configurados
-4. **Re-run:** Click em "Re-run failed jobs"
-
-### **Docker Compose Falhou**
-
-```bash
-# Ver logs
-docker-compose -f docker-compose.test.yml logs
-
-# Rebuild
-docker-compose -f docker-compose.test.yml build --no-cache
-
-# Limpar tudo
-docker-compose -f docker-compose.test.yml down -v
-```
+✅ **Qualidade garantida** - Código sempre validado  
+✅ **Detecção precoce** - Bugs encontrados antes de produção  
+✅ **Confiança** - Push sem medo de quebrar  
+✅ **Documentação** - Histórico de testes no GitHub  
+✅ **Automação** - Testes rodam sozinhos  
 
 ---
 
-## 📝 Boas Práticas
+**🚀 Pipeline configurado e pronto para usar!**
 
-### **Escrevendo Testes:**
-
-1. **AAA Pattern:**
-   ```python
-   def test_exemplo():
-       # Arrange (preparar)
-       client = app.test_client()
-       
-       # Act (executar)
-       response = client.get('/health')
-       
-       # Assert (verificar)
-       assert response.status_code == 200
-   ```
-
-2. **Nomes Descritivos:**
-   ```python
-   def test_health_endpoint_returns_ok_when_database_connected()
-   def test_query_endpoint_returns_400_when_no_question_provided()
-   ```
-
-3. **Mock Externo:**
-   ```python
-   @patch('app.executar_sql')
-   def test_with_mock(mock_sql):
-       mock_sql.return_value = [{'test': 1}]
-       # ...
-   ```
-
-### **Commits Semânticos:**
-```
-feat: adicionar endpoint de busca
-fix: corrigir erro no cálculo
-test: adicionar testes para API
-docs: atualizar README
-refactor: melhorar performance
-```
-
----
-
-## 🎯 Métricas de Qualidade
-
-### **Targets:**
-- ✅ Coverage: **>= 80%**
-- ✅ Build time: **< 15 min**
-- ✅ Test success rate: **> 95%**
-- ✅ Code quality: **A rating**
-
-### **Dashboards:**
-- GitHub Actions (tempo, status)
-- Codecov (coverage trends)
-- SonarCloud (qualidade, bugs, vulnerabilidades)
-
----
-
-## 📦 Arquivos Criados
-
-```
-.github/workflows/
-├── ci-cd.yml                 # Pipeline principal
-└── README.md                 # Documentação do workflow
-
-api/tests/
-├── __init__.py
-├── conftest.py               # Config pytest
-└── test_api.py               # Testes da API
-
-llm-service/tests/
-├── __init__.py
-├── conftest.py
-└── test_llm_api.py           # Testes do LLM
-
-next-app/
-├── jest.config.js            # Config Jest
-├── jest.setup.js             # Setup e mocks
-└── __tests__/
-    ├── pages/
-    │   └── index.test.jsx
-    ├── components/
-    │   └── DataTable.test.jsx
-    └── lib/
-        └── apiClient.test.js
-
-tests/
-└── mock-ollama-response.json # Mock Ollama
-
-docker-compose.test.yml       # Compose para testes
-
-run-tests.sh                  # Script Linux/Mac
-run-tests.ps1                 # Script Windows
-
-CI_CD_GUIDE.md                # Este arquivo
-```
-
----
-
-## 🚀 Próximos Passos
-
-### **Curto Prazo:**
-- [ ] Aumentar coverage para 90%
-- [ ] Adicionar testes E2E (Playwright)
-- [ ] Configurar Codecov
-- [ ] Configurar SonarCloud
-
-### **Médio Prazo:**
-- [ ] Performance tests (k6)
-- [ ] Security scanning (Snyk)
-- [ ] Deploy staging automático
-- [ ] Slack/Discord notifications
-
-### **Longo Prazo:**
-- [ ] Chaos engineering
-- [ ] Load testing
-- [ ] A/B testing framework
-- [ ] Feature flags
-
----
-
-**Criado em:** 13/10/2025  
-**Versão:** 1.0.0  
-**Status:** ✅ **OPERACIONAL**
-
-**🎉 CI/CD COMPLETO E FUNCIONANDO!**
-
+Execute: `.\validate-all.ps1` para começar!

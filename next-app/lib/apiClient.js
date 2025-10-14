@@ -1,90 +1,111 @@
 /**
- * Cliente para comunicação com a API local (PostgreSQL)
+ * Cliente API - Gerenciador de conexão com backend
+ * Lida com erros de conexão e fallback gracioso
  */
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const LLM_URL = process.env.NEXT_PUBLIC_LLM_URL || 'http://localhost:8000';
 
 /**
- * Verifica o status da API
+ * Verificar se API está acessível
  */
-export async function checkApiHealth() {
+export async function checkAPIHealth() {
   try {
-    const response = await fetch(`${API_URL}/health`);
-    const data = await response.json();
-    return { success: true, data };
+    const response = await fetch(`${API_URL}/health`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(3000) // 3s timeout
+    });
+    return response.ok;
   } catch (error) {
-    return { success: false, error: error.message };
+    console.warn('API não está acessível:', error.message);
+    return false;
   }
 }
 
 /**
- * Executa uma consulta no banco de dados PostgreSQL
- * @param {string} question - Pergunta em linguagem natural ou SQL direto
- * @returns {Promise} - Retorna os resultados da consulta
+ * Verificar se LLM está acessível
  */
-export async function queryDatabase(question) {
+export async function checkLLMHealth() {
   try {
-    const response = await fetch(`${API_URL}/query`, {
-      method: 'POST',
+    const response = await fetch(`${LLM_URL}/health`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(3000)
+    });
+    return response.ok;
+  } catch (error) {
+    console.warn('LLM não está acessível:', error.message);
+    return false;
+  }
+}
+
+/**
+ * Fazer requisição à API com tratamento de erros
+ */
+export async function apiRequest(endpoint, options = {}) {
+  const url = `${API_URL}${endpoint}`;
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
       headers: {
         'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ question }),
+        ...options.headers
+      }
     });
 
     if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    const data = await response.json();
-    return { success: true, data };
+    return await response.json();
   } catch (error) {
-    return { success: false, error: error.message };
+    console.error(`Erro na requisição para ${endpoint}:`, error);
+    throw error;
   }
 }
 
 /**
- * Obtém estatísticas gerais do banco de dados
+ * Fazer requisição ao LLM com tratamento de erros
  */
-export async function getStatistics() {
-  return queryDatabase('estatisticas gerais');
-}
-
-/**
- * Busca empresas
- * @param {number} limit - Número máximo de resultados
- */
-export async function getEmpresas(limit = 20) {
-  return queryDatabase(`empresas razao social`);
-}
-
-/**
- * Executa uma consulta SQL customizada (use com cuidado!)
- * @param {string} sql - Query SQL
- */
-export async function executeCustomSQL(sql) {
+export async function llmRequest(endpoint, options = {}) {
+  const url = `${LLM_URL}${endpoint}`;
+  
   try {
-    const response = await fetch(`${API_URL}/query`, {
-      method: 'POST',
+    const response = await fetch(url, {
+      ...options,
       headers: {
         'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ 
-        question: sql,
-        // Flag para indicar que é SQL direto (se a API suportar no futuro)
-        directSQL: true 
-      }),
+        ...options.headers
+      }
     });
 
     if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    const data = await response.json();
-    return { success: true, data };
+    return await response.json();
   } catch (error) {
-    return { success: false, error: error.message };
+    console.error(`Erro na requisição LLM para ${endpoint}:`, error);
+    throw error;
   }
 }
 
+/**
+ * Status de saúde do sistema
+ */
+export async function getSystemHealth() {
+  const [apiOk, llmOk] = await Promise.all([
+    checkAPIHealth(),
+    checkLLMHealth()
+  ]);
 
+  return {
+    api: apiOk,
+    llm: llmOk,
+    overall: apiOk && llmOk
+  };
+}
+
+export { API_URL, LLM_URL };
