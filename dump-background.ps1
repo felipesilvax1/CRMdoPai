@@ -8,8 +8,11 @@ Write-Host "========================================" -ForegroundColor Cyan
 
 Write-Host "`nExecutando dump..." -ForegroundColor Yellow
 
+# Definir senha PostgreSQL
+$env:PGPASSWORD = "password"
+
 # Executar dump
-docker run --rm --network host -v C:\Users\PwC\Documents\CRM:/backup postgres:17 pg_dump -h 192.168.15.22 -U postgres -Fc cnpj_processado -f /backup/cnpj_processado.dump
+docker run --rm --network host -e PGPASSWORD=password -v C:\Users\PwC\Documents\CRM:/backup postgres:17 pg_dump -h 192.168.15.22 -U postgres -Fc cnpj_processado -f /backup/cnpj_processado.dump
 if ($LASTEXITCODE -eq 0) {
     $endTime = Get-Date
     $duration = $endTime - $startTime
