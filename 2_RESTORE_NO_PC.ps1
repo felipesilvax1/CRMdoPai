@@ -115,3 +115,5 @@ docker exec $LOCAL_CONTAINER rm -rf /tmp/dump_cnpj 2>$null
 Write-Host "`nTempo total: $([math]::Round($tempo.TotalMinutes, 1)) minutos`n" -ForegroundColor Cyan
 
 
+
+

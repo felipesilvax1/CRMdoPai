@@ -87,3 +87,4 @@ Monitore esses logs para identificar queries lentas.
 **Última atualização**: Query com JOIN funcionando perfeitamente
 
 
+

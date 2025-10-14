@@ -1,0 +1,90 @@
+═══════════════════════════════════════════════════════════
+🔥 COMO LIBERAR A PORTA 5000 NO FIREWALL
+═══════════════════════════════════════════════════════════
+
+🎯 PROBLEMA:
+O frontend não consegue acessar a API porque o Windows Firewall
+bloqueia conexões externas na porta 5000.
+
+═══════════════════════════════════════════════════════════
+✅ SOLUÇÃO - 3 MÉTODOS (escolha um):
+═══════════════════════════════════════════════════════════
+
+─────────────────────────────────────────────────────────
+MÉTODO 1: Arquivo .BAT (MAIS FÁCIL) ⭐
+─────────────────────────────────────────────────────────
+
+1. Localize o arquivo: liberar-firewall-5000.bat
+2. Clique com BOTÃO DIREITO
+3. Selecione "Executar como Administrador"
+4. Aguarde a mensagem de sucesso
+
+─────────────────────────────────────────────────────────
+MÉTODO 2: PowerShell
+─────────────────────────────────────────────────────────
+
+1. Pesquise "PowerShell" no menu Iniciar
+2. Clique com BOTÃO DIREITO → "Executar como Administrador"
+3. Cole e execute:
+
+New-NetFirewallRule -DisplayName "CRM API 5000" -Direction Inbound -LocalPort 5000 -Protocol TCP -Action Allow
+
+─────────────────────────────────────────────────────────
+MÉTODO 3: Prompt de Comando (netsh)
+─────────────────────────────────────────────────────────
+
+1. Pesquise "cmd" no menu Iniciar
+2. Clique com BOTÃO DIREITO → "Executar como Administrador"
+3. Cole e execute:
+
+netsh advfirewall firewall add rule name="CRM API 5000" dir=in action=allow protocol=TCP localport=5000
+
+═══════════════════════════════════════════════════════════
+🧪 COMO TESTAR SE FUNCIONOU:
+═══════════════════════════════════════════════════════════
+
+1. No PowerShell normal (não precisa ser admin):
+
+Test-NetConnection -ComputerName 192.168.15.22 -Port 5000
+
+   Se mostrar "TcpTestSucceeded : True" = FUNCIONOU! ✅
+   Se mostrar "TcpTestSucceeded : False" = Ainda bloqueado ❌
+
+2. No navegador:
+
+http://192.168.15.22:5000/filtros/ufs
+
+   Se mostrar JSON com estados = FUNCIONOU! ✅
+   Se der erro de conexão = Ainda bloqueado ❌
+
+═══════════════════════════════════════════════════════════
+❓ PERGUNTAS FREQUENTES:
+═══════════════════════════════════════════════════════════
+
+P: Por que preciso fazer isso?
+R: O Windows Firewall bloqueia conexões externas por segurança.
+   Docker mapeia a porta, mas o Firewall ainda precisa permitir.
+
+P: Isso é porque o banco está fora do Docker?
+R: NÃO! O problema é a porta da API (5000), não do banco (5432).
+   Mesmo com banco no Docker, precisaria liberar a porta 5000.
+
+P: É seguro abrir essa porta?
+R: Sim, se você está em rede local confiável.
+   A porta só fica aberta na sua rede (192.168.15.x).
+
+P: Preciso fazer isso toda vez?
+R: NÃO! A regra fica salva permanentemente no Firewall.
+
+═══════════════════════════════════════════════════════════
+🚨 SE NADA FUNCIONAR:
+═══════════════════════════════════════════════════════════
+
+Verifique se há antivírus ou firewall de terceiros (Avast, Norton, etc)
+que podem estar bloqueando a porta independentemente do Windows Firewall.
+
+Nesses casos, você precisa configurar também no software de segurança.
+
+═══════════════════════════════════════════════════════════
+
+

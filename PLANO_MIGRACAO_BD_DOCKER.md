@@ -141,3 +141,4 @@ Crítica: Criar índices (após migração)
 **Data**: 14/10/2025
 **Status**: Aguardando decisão do usuário
 
+
