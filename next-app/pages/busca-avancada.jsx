@@ -1,10 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
 import DataTable from '../components/DataTable';
 
 const DEV_MODE = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
+// Cache simples para evitar chamadas duplicadas
+const cache = {
+  ufs: null,
+  cnaes: null,
+  municipios: {},
+  bairros: {}
+};
 
 export default function BuscaAvancada() {
   const [user, setUser] = useState(null);
@@ -88,40 +96,73 @@ export default function BuscaAvancada() {
     checkSession();
   }, [router]);
 
-  // Carregar opções para dropdowns
-  const carregarOpcoes = async () => {
+  // Carregar opções para dropdowns (COM CACHE)
+  const carregarOpcoes = useCallback(async () => {
     try {
-      // UFs
-      const ufsResponse = await fetch(`${API_URL}/filtros/ufs`);
-      const ufsData = await ufsResponse.json();
-      if (ufsData.ufs && ufsData.ufs.length > 0) {
-        setOpcoes(prev => ({ ...prev, ufs: ufsData.ufs }));
+      // UFs (usar cache se disponível)
+      if (cache.ufs) {
+        console.log('📦 UFs carregadas do cache');
+        setOpcoes(prev => ({ ...prev, ufs: cache.ufs }));
+      } else {
+        const ufsResponse = await fetch(`${API_URL}/filtros/ufs`);
+        const ufsData = await ufsResponse.json();
+        if (ufsData.ufs && ufsData.ufs.length > 0) {
+          cache.ufs = ufsData.ufs; // Salvar no cache
+          setOpcoes(prev => ({ ...prev, ufs: ufsData.ufs }));
+          console.log('✅ UFs carregadas da API');
+        }
       }
 
-      // CNAEs principais
-      const cnaesResponse = await fetch(`${API_URL}/filtros/cnaes?limit=100`);
-      const cnaesData = await cnaesResponse.json();
-      if (cnaesData.cnaes) {
-        setOpcoes(prev => ({ ...prev, cnaes: cnaesData.cnaes }));
+      // CNAEs principais (usar cache se disponível)
+      if (cache.cnaes) {
+        console.log('📦 CNAEs carregadas do cache');
+        setOpcoes(prev => ({ ...prev, cnaes: cache.cnaes }));
+      } else {
+        const cnaesResponse = await fetch(`${API_URL}/filtros/cnaes?limit=100`);
+        const cnaesData = await cnaesResponse.json();
+        if (cnaesData.cnaes) {
+          cache.cnaes = cnaesData.cnaes; // Salvar no cache
+          setOpcoes(prev => ({ ...prev, cnaes: cnaesData.cnaes }));
+          console.log('✅ CNAEs carregadas da API');
+        }
       }
 
     } catch (error) {
       console.error('Erro ao carregar filtros:', error);
     }
-  };
+  }, []);
 
-  // Carregar municípios quando UF mudar
+  // Carregar municípios quando UF mudar (COM CACHE + DEBOUNCE)
+  const isLoadingMunicipios = useRef(false);
+  
   useEffect(() => {
     if (filtros.uf) {
+      // Verificar cache primeiro
+      const cacheKey = filtros.uf;
+      if (cache.municipios[cacheKey]) {
+        console.log(`📦 Municípios de ${filtros.uf} carregados do cache`);
+        setOpcoes(prev => ({ ...prev, municipios: cache.municipios[cacheKey], bairros: [] }));
+        setFiltros(prev => ({ ...prev, municipio: '', bairro: '' }));
+        return;
+      }
+
+      // Evitar múltiplas chamadas simultâneas
+      if (isLoadingMunicipios.current) {
+        console.log('⏳ Já está carregando municípios, aguarde...');
+        return;
+      }
+
+      isLoadingMunicipios.current = true;
       const startTime = performance.now();
       
       fetch(`${API_URL}/filtros/municipios?uf=${filtros.uf}&limit=50`)
         .then(res => res.json())
         .then(data => {
           const elapsed = performance.now() - startTime;
-          console.log(`⏱️ Municípios carregados em ${elapsed.toFixed(0)}ms (${data.municipios?.length || 0} resultados)`);
+          console.log(`⏱️ Municípios de ${filtros.uf} carregados em ${elapsed.toFixed(0)}ms (${data.municipios?.length || 0} resultados)`);
           
           if (data.municipios) {
+            cache.municipios[cacheKey] = data.municipios; // Salvar no cache
             setOpcoes(prev => ({ ...prev, municipios: data.municipios, bairros: [] }));
           }
           
@@ -129,7 +170,10 @@ export default function BuscaAvancada() {
             console.log(`📊 Tempo no servidor: ${data.tempo_ms}ms`);
           }
         })
-        .catch(console.error);
+        .catch(console.error)
+        .finally(() => {
+          isLoadingMunicipios.current = false;
+        });
       
       // Limpar município e bairro quando UF mudar
       setFiltros(prev => ({ ...prev, municipio: '', bairro: '' }));
@@ -139,17 +183,44 @@ export default function BuscaAvancada() {
     }
   }, [filtros.uf]);
 
-  // Carregar bairros quando município mudar
+  // Carregar bairros quando município mudar (COM CACHE)
+  const isLoadingBairros = useRef(false);
+  
   useEffect(() => {
     if (filtros.municipio && filtros.uf) {
+      // Verificar cache primeiro
+      const cacheKey = `${filtros.uf}-${filtros.municipio}`;
+      if (cache.bairros[cacheKey]) {
+        console.log(`📦 Bairros de ${filtros.municipio} carregados do cache`);
+        setOpcoes(prev => ({ ...prev, bairros: cache.bairros[cacheKey] }));
+        setFiltros(prev => ({ ...prev, bairro: '' }));
+        return;
+      }
+
+      // Evitar múltiplas chamadas simultâneas
+      if (isLoadingBairros.current) {
+        console.log('⏳ Já está carregando bairros, aguarde...');
+        return;
+      }
+
+      isLoadingBairros.current = true;
+      const startTime = performance.now();
+      
       fetch(`${API_URL}/filtros/bairros?uf=${filtros.uf}&municipio=${filtros.municipio}`)
         .then(res => res.json())
         .then(data => {
+          const elapsed = performance.now() - startTime;
+          console.log(`⏱️ Bairros carregados em ${elapsed.toFixed(0)}ms (${data.bairros?.length || 0} resultados)`);
+          
           if (data.bairros) {
+            cache.bairros[cacheKey] = data.bairros; // Salvar no cache
             setOpcoes(prev => ({ ...prev, bairros: data.bairros }));
           }
         })
-        .catch(console.error);
+        .catch(console.error)
+        .finally(() => {
+          isLoadingBairros.current = false;
+        });
       
       // Limpar bairro quando município mudar
       setFiltros(prev => ({ ...prev, bairro: '' }));
@@ -157,7 +228,7 @@ export default function BuscaAvancada() {
       setOpcoes(prev => ({ ...prev, bairros: [] }));
       setFiltros(prev => ({ ...prev, bairro: '' }));
     }
-  }, [filtros.municipio]);
+  }, [filtros.municipio, filtros.uf]);
 
   // Atualizar filtro
   const updateFiltro = (campo, valor) => {
