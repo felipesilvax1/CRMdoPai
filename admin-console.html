@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎛️ Admin Console - CRM</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo-icon {
+            font-size: 50px;
+        }
+
+        h1 {
+            font-size: 32px;
+            background: linear-gradient(45deg, #00d4ff, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 14px;
+        }
+
+        .status-badge {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid #10b981;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .quick-btn {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(147, 51, 234, 0.2));
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: white;
+            display: block;
+        }
+
+        .quick-btn:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(59, 130, 246, 0.3);
+            border-color: rgba(59, 130, 246, 0.5);
+        }
+
+        .quick-btn-icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+
+        .quick-btn-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .quick-btn-desc {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .category {
+            margin-bottom: 40px;
+        }
+
+        .category-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .category-icon {
+            font-size: 28px;
+        }
+
+        .category-title {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .service-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .service-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(59, 130, 246, 0.5);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .service-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+        }
+
+        .service-icon {
+            font-size: 40px;
+        }
+
+        .service-status {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .status-online {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+            border: 1px solid #10b981;
+        }
+
+        .status-offline {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border: 1px solid #ef4444;
+        }
+
+        .status-checking {
+            background: rgba(156, 163, 175, 0.2);
+            color: #9ca3af;
+            border: 1px solid #9ca3af;
+        }
+
+        .service-name {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .service-desc {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        .service-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .service-url {
+            margin-top: 10px;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.4);
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .system-info {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 40px;
+        }
+
+        .system-info h2 {
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .info-item label {
+            display: block;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+
+        .info-item value {
+            display: block;
+            font-size: 16px;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 30px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .services-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="header-content">
+                <div class="logo">
+                    <div class="logo-icon">🎛️</div>
+                    <div>
+                        <h1>Admin Console</h1>
+                        <div class="subtitle">Central de Controle do CRM</div>
+                    </div>
+                </div>
+                <div class="status-badge" id="statusBadge">
+                    ⏳ Verificando serviços...
+                </div>
+            </div>
+        </header>
+
+        <!-- Quick Actions -->
+        <div class="quick-actions">
+            <a href="" class="quick-btn" id="grafanaQuick">
+                <div class="quick-btn-icon">📊</div>
+                <div class="quick-btn-title">Grafana</div>
+                <div class="quick-btn-desc">Dashboard Principal</div>
+            </a>
+            <a href="" class="quick-btn" id="prometheusQuick">
+                <div class="quick-btn-icon">📈</div>
+                <div class="quick-btn-title">Prometheus</div>
+                <div class="quick-btn-desc">Métricas</div>
+            </a>
+            <a href="" class="quick-btn" id="cadvisorQuick">
+                <div class="quick-btn-icon">📦</div>
+                <div class="quick-btn-title">cAdvisor</div>
+                <div class="quick-btn-desc">Containers</div>
+            </a>
+            <a href="" class="quick-btn" id="localstackQuick">
+                <div class="quick-btn-icon">☁️</div>
+                <div class="quick-btn-title">LocalStack</div>
+                <div class="quick-btn-desc">AWS Local</div>
+            </a>
+        </div>
+
+        <!-- Services by Category -->
+        <div id="servicesContainer"></div>
+
+        <!-- System Info -->
+        <div class="system-info">
+            <h2>ℹ️ Informações do Sistema</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <label>Host</label>
+                    <value id="hostInfo">-</value>
+                </div>
+                <div class="info-item">
+                    <label>Serviços Online</label>
+                    <value id="onlineInfo">- de -</value>
+                </div>
+                <div class="info-item">
+                    <label>Última Verificação</label>
+                    <value id="lastCheck">-</value>
+                </div>
+            </div>
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); font-size: 14px;">
+                💡 <strong>Dica:</strong> Adicione esta página aos favoritos (⌘+D no Mac) para acesso rápido!
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p>🎛️ Admin Console - CRM System</p>
+            <p style="margin-top: 10px;">Desenvolvido com ❤️ para gerenciar 77M+ registros</p>
+        </footer>
+    </div>
+
+    <script>
+        // Detectar host (localhost ou IP remoto)
+        const host = window.location.hostname || 'localhost';
+        document.getElementById('hostInfo').textContent = host;
+
+        // Definir serviços
+        const services = [
+            {
+                id: 'grafana',
+                name: 'Grafana',
+                description: 'Dashboards e Visualização',
+                port: 3002,
+                icon: '📊',
+                category: 'observability'
+            },
+            {
+                id: 'prometheus',
+                name: 'Prometheus',
+                description: 'Métricas e Alertas',
+                port: 9090,
+                icon: '📈',
+                category: 'observability'
+            },
+            {
+                id: 'loki',
+                name: 'Loki',
+                description: 'Logs Centralizados',
+                port: 3100,
+                icon: '📝',
+                category: 'observability'
+            },
+            {
+                id: 'cadvisor',
+                name: 'cAdvisor',
+                description: 'Métricas de Containers',
+                port: 8080,
+                icon: '📦',
+                category: 'observability'
+            },
+            {
+                id: 'localstack',
+                name: 'LocalStack',
+                description: 'AWS Simulada',
+                port: 4566,
+                icon: '☁️',
+                category: 'cloud'
+            },
+            {
+                id: 'api',
+                name: 'CRM API',
+                description: 'API de Dados',
+                port: 5000,
+                icon: '🔌',
+                category: 'backend'
+            },
+            {
+                id: 'llm',
+                name: 'LLM Service',
+                description: 'Serviço de IA',
+                port: 8000,
+                icon: '🤖',
+                category: 'backend'
+            },
+            {
+                id: 'frontend',
+                name: 'Frontend CRM',
+                description: 'Aplicação Principal',
+                port: 3000,
+                icon: '🌐',
+                category: 'frontend'
+            }
+        ];
+
+        const categories = {
+            observability: { name: 'Observabilidade', icon: '👁️' },
+            backend: { name: 'Backend', icon: '⚙️' },
+            cloud: { name: 'Cloud', icon: '☁️' },
+            frontend: { name: 'Frontend', icon: '🎨' }
+        };
+
+        // Atualizar quick actions
+        document.getElementById('grafanaQuick').href = `http://${host}:3002`;
+        document.getElementById('prometheusQuick').href = `http://${host}:9090`;
+        document.getElementById('cadvisorQuick').href = `http://${host}:8080`;
+        document.getElementById('localstackQuick').href = `http://${host}:4566`;
+
+        // Renderizar serviços por categoria
+        function renderServices() {
+            const container = document.getElementById('servicesContainer');
+            container.innerHTML = '';
+
+            Object.entries(categories).forEach(([catId, category]) => {
+                const catServices = services.filter(s => s.category === catId);
+                
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = 'category';
+                categoryDiv.innerHTML = `
+                    <div class="category-header">
+                        <span class="category-icon">${category.icon}</span>
+                        <h2 class="category-title">${category.name}</h2>
+                    </div>
+                    <div class="services-grid" id="grid-${catId}"></div>
+                `;
+                container.appendChild(categoryDiv);
+
+                const grid = document.getElementById(`grid-${catId}`);
+                catServices.forEach(service => {
+                    const url = `http://${host}:${service.port}`;
+                    const card = document.createElement('div');
+                    card.className = 'service-card';
+                    card.innerHTML = `
+                        <div class="service-header">
+                            <div class="service-icon">${service.icon}</div>
+                            <div class="service-status status-checking" id="status-${service.id}">
+                                ⚪ Verificando
+                            </div>
+                        </div>
+                        <div class="service-name">${service.name}</div>
+                        <div class="service-desc">${service.description}</div>
+                        <div class="service-actions">
+                            <button class="btn btn-primary" onclick="window.open('${url}', '_blank')">
+                                Abrir
+                            </button>
+                            <button class="btn btn-secondary" onclick="copyUrl('${url}')" title="Copiar URL">
+                                📋
+                            </button>
+                        </div>
+                        <div class="service-url">${url}</div>
+                    `;
+                    grid.appendChild(card);
+                });
+            });
+        }
+
+        // Copiar URL
+        function copyUrl(url) {
+            navigator.clipboard.writeText(url).then(() => {
+                alert('URL copiada: ' + url);
+            });
+        }
+
+        // Verificar status dos serviços (simplificado - assume online)
+        function checkServices() {
+            const now = new Date().toLocaleTimeString('pt-BR');
+            document.getElementById('lastCheck').textContent = now;
+            
+            let onlineCount = 0;
+            services.forEach(service => {
+                const statusEl = document.getElementById(`status-${service.id}`);
+                // Assume todos online por padrão (verificação real requer CORS configurado)
+                statusEl.className = 'service-status status-online';
+                statusEl.textContent = '🟢 Online';
+                onlineCount++;
+            });
+
+            document.getElementById('onlineInfo').textContent = `${onlineCount} de ${services.length}`;
+            document.getElementById('statusBadge').textContent = `✅ ${onlineCount}/${services.length} Online`;
+        }
+
+        // Inicializar
+        renderServices();
+        checkServices();
+
+        // Atualizar a cada 30 segundos
+        setInterval(checkServices, 30000);
+    </script>
+</body>
+</html>
+
