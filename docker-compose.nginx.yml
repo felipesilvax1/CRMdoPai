@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: crm-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro  # Para SSL futuro
+      - nginx_logs:/var/log/nginx
+    networks:
+      - crm-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    # Extra hosts para acessar serviços no host Windows
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  nginx_logs:
+    driver: local
+
+networks:
+  crm-network:
+    external: true
+
