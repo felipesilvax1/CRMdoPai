@@ -108,4 +108,85 @@ export async function getSystemHealth() {
   };
 }
 
+/**
+ * Legacy function - Check API health (formato antigo compatível)
+ * Retorna objeto com success e data para compatibilidade
+ */
+export async function checkApiHealth() {
+  try {
+    const response = await fetch(`${API_URL}/health`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(3000)
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        success: true,
+        data: data
+      };
+    }
+    
+    return { success: false };
+  } catch (error) {
+    console.warn('API não está acessível:', error.message);
+    return { success: false };
+  }
+}
+
+/**
+ * Legacy function - Get empresas (formato antigo compatível)
+ */
+export async function getEmpresas(limit = 50) {
+  try {
+    const response = await fetch(`${API_URL}/query/completo?limit=${limit}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        success: true,
+        data: data
+      };
+    }
+
+    return { success: false };
+  } catch (error) {
+    console.error('Erro ao buscar empresas:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Legacy function - Query database
+ */
+export async function queryDatabase(query) {
+  try {
+    const response = await fetch(`${API_URL}/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        success: true,
+        data: data
+      };
+    }
+
+    return { success: false };
+  } catch (error) {
+    console.error('Erro ao executar query:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Aliases para compatibilidade
+export const checkLlmHealth = checkLLMHealth;
+
 export { API_URL, LLM_URL };
